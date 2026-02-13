@@ -1,3 +1,7 @@
 log_*.txt
 __pycache__/
 *.md
+
+# Local dev tools
+.claude/
+*.patch
