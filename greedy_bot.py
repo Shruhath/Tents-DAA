@@ -117,5 +117,111 @@ class GreedyBot:
                         # If only 1 empty neighbor, it MUST be the tent
                         if len(empty_neighbors) == 1:
                             return (empty_neighbors[0][0], empty_neighbors[0][1], TENT, cells_scanned)
-                        
+
+        # 5. "No-Man's Land" Heuristic (Empty cell has no adjacent Tree -> Grass)
+        # Tents MUST be adjacent to a tree. If a spot is not near a tree, it's useless.
+        for r in range(self.size):
+            for c in range(self.size):
+                cells_scanned += 1
+                if self.game.player_grid[r][c] == EMPTY:
+                    # Check neighbors for TREE
+                    neighbors = self.game._get_orthogonal_neighbors(r, c)
+                    has_tree_neighbor = False
+                    for nr, nc in neighbors:
+                         cells_scanned += 1
+                         if self.game.player_grid[nr][nc] == TREE:
+                                has_tree_neighbor = True
+                                break
+                    
+                    if not has_tree_neighbor:
+                        return (r, c, GRASS, cells_scanned)
+
+        # 6. Locked Candidates Rule (Advanced)
+        # If N trees are "locked" into a specific Row/Col (meaning all their valid spots are in that line),
+        # AND that Row/Col needs exactly N more tents (or existing_tents + N == target),
+        # THEN all *other* empty cells in that Row/Col (not utilized by these trees) must be GRASS.
+        
+        # Check ROWS
+        for r in range(self.size):
+            locked_trees = [] 
+            # Find trees locked to this row
+            for tree_idx, (tr, tc) in enumerate(self.game.trees):
+                # Is this tree satisfied?
+                neighbors = self.game._get_orthogonal_neighbors(tr, tc)
+                has_tent = False
+                valid_spots = []
+                for nr, nc in neighbors:
+                    if self.game.player_grid[nr][nc] == TENT:
+                        has_tent = True
+                        break
+                    if self.game.player_grid[nr][nc] == EMPTY:
+                        valid_spots.append((nr, nc))
+                
+                if has_tent: continue 
+                
+                if valid_spots:
+                    # Check if all valid spots are in THIS row
+                    if all(spot[0] == r for spot in valid_spots):
+                        locked_trees.append((tr, tc)) # This tree relies on this row
+            
+            # Now, check logic
+            current_tents = self.game.player_grid[r].count(TENT)
+            target = self.game.row_constraints[r]
+            
+            if current_tents + len(locked_trees) == target:
+                # Elimination: Mark non-locked empties as GRASS
+                # We need to know which cells are "reserved" by the locked trees
+                reserved_cells = set()
+                for tr, tc in locked_trees:
+                    neighbors = self.game._get_orthogonal_neighbors(tr, tc)
+                    for nr, nc in neighbors:
+                         if self.game.player_grid[nr][nc] == EMPTY:
+                                reserved_cells.add((nr, nc))
+                
+                # Scan row for empties NOT in reserved
+                for c in range(self.size):
+                    cells_scanned += 1
+                    if self.game.player_grid[r][c] == EMPTY:
+                        if (r, c) not in reserved_cells:
+                            return (r, c, GRASS, cells_scanned)
+
+        # Check COLS
+        for c in range(self.size):
+            locked_trees = []
+            for tree_idx, (tr, tc) in enumerate(self.game.trees):
+                neighbors = self.game._get_orthogonal_neighbors(tr, tc)
+                has_tent = False
+                valid_spots = []
+                for nr, nc in neighbors:
+                    if self.game.player_grid[nr][nc] == TENT:
+                        has_tent = True
+                        break
+                    if self.game.player_grid[nr][nc] == EMPTY:
+                        valid_spots.append((nr, nc))
+                
+                if has_tent: continue
+                
+                if valid_spots:
+                    if all(spot[1] == c for spot in valid_spots):
+                        locked_trees.append((tr, tc))
+            
+            # Logic
+            current_tents = sum(1 for r in range(self.size) if self.game.player_grid[r][c] == TENT)
+            target = self.game.col_constraints[c]
+            
+            if current_tents + len(locked_trees) == target:
+                 reserved_cells = set()
+                 for tr, tc in locked_trees:
+                    neighbors = self.game._get_orthogonal_neighbors(tr, tc)
+                    for nr, nc in neighbors:
+                         if self.game.player_grid[nr][nc] == EMPTY:
+                                reserved_cells.add((nr, nc))
+                                
+                 for r in range(self.size):
+                    cells_scanned += 1
+                    if self.game.player_grid[r][c] == EMPTY:
+                        if (r, c) not in reserved_cells:
+                            return (r, c, GRASS, cells_scanned)
+
         return None
+

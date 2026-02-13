@@ -197,3 +197,24 @@ class TentsGame:
                     return False
         return True
 
+    def clone_for_race(self):
+        """
+        Creates a new TentsGame instance with the exact same solution and constraints,
+        but a fresh player_grid (reset to initial state).
+        Used for the Bot in Versus Mode.
+        """
+        new_game = TentsGame(self.size)
+        
+        # Copy solution and constraints
+        new_game.solution_grid = copy.deepcopy(self.solution_grid)
+        new_game.row_constraints = self.row_constraints[:]
+        new_game.col_constraints = self.col_constraints[:]
+        new_game.trees = self.trees[:]
+        
+        # Setup player grid (Trees only)
+        new_game.player_grid = [[EMPTY for _ in range(self.size)] for _ in range(self.size)]
+        for r, c in self.trees:
+            new_game.player_grid[r][c] = TREE
+            
+        return new_game
+
