@@ -2,6 +2,7 @@ from tents import TentsGame, TREE, TENT, EMPTY, GRASS
 from solver_utils import (
     solve_line_dp, find_forced_moves,
     build_constraint_graph, find_connected_components,
+    solve_with_dnc,
 )
 
 def test_generation():
@@ -220,6 +221,75 @@ def test_connected_components():
     print("test_connected_components PASSED!")
 
 
+def test_split_board_dnc():
+    """Step 13 – Full split-board scenario using solve_with_dnc.
+
+    5x5 board with a GRASS wall down column 2, creating two independent
+    regions.  Row constraints [0, 1, 0, 1, 0] force rows 0/2/4 to all-GRASS.
+    Column constraints [1, 0, 0, 0, 1] force cols 1/3 EMPTY cells to GRASS.
+
+    Layout (initial):
+        . . G . .       row constraint 0
+        . . G . .       row constraint 1
+        . . G . .       row constraint 0
+        . . G . .       row constraint 1
+        . . G . .       row constraint 0
+       c0 c1 c2 c3 c4
+       col constraints: 1  0  0  0  1
+
+    After solve_with_dnc, at minimum:
+      - All cells in rows 0, 2, 4 should be GRASS.
+      - All cells in col 1 and col 3 (rows 1, 3) should be GRASS.
+    """
+    print("\nTesting Split Board D&C (5x5, GRASS wall at col 2)...")
+
+    game = TentsGame(size=5)
+
+    # Build player grid: col 2 = GRASS, rest EMPTY
+    for r in range(5):
+        for c in range(5):
+            game.player_grid[r][c] = GRASS if c == 2 else EMPTY
+
+    game.row_constraints = [0, 1, 0, 1, 0]
+    game.col_constraints = [1, 0, 0, 0, 1]
+
+    # Count EMPTY cells before
+    empty_before = sum(
+        1 for r in range(5) for c in range(5)
+        if game.player_grid[r][c] == EMPTY
+    )
+
+    progress = solve_with_dnc(game)
+
+    # Count EMPTY cells after
+    empty_after = sum(
+        1 for r in range(5) for c in range(5)
+        if game.player_grid[r][c] == EMPTY
+    )
+
+    assert progress, "solve_with_dnc should have made progress"
+    assert empty_after < empty_before, (
+        f"Expected fewer EMPTY cells after solving. Before={empty_before}, After={empty_after}"
+    )
+
+    # Rows with constraint 0 should be entirely GRASS (no EMPTY left)
+    for r in (0, 2, 4):
+        for c in range(5):
+            assert game.player_grid[r][c] != EMPTY, (
+                f"Cell ({r},{c}) should not be EMPTY (row constraint is 0)"
+            )
+
+    # Cols 1 and 3 have constraint 0 → remaining EMPTY cells should be GRASS
+    for c in (1, 3):
+        for r in range(5):
+            assert game.player_grid[r][c] != EMPTY, (
+                f"Cell ({r},{c}) should not be EMPTY (col constraint is 0)"
+            )
+
+    print(f"  EMPTY cells: {empty_before} -> {empty_after}")
+    print("test_split_board_dnc PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -227,3 +297,4 @@ if __name__ == "__main__":
     test_dp_zero_constraint()
     test_dp_impossible_row()
     test_connected_components()
+    test_split_board_dnc()
