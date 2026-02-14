@@ -188,5 +188,23 @@ def find_connected_components(graph: dict) -> list:
         List of sets, where each set contains the ``(r, c)`` tuples
         belonging to one connected component.
     """
-    # TODO: Implement in Step 11 (BFS/DFS components).
-    raise NotImplementedError("find_connected_components not yet implemented")
+    visited = set()
+    components = []
+
+    for node in graph:
+        if node in visited:
+            continue
+        # BFS from this unvisited node
+        component = set()
+        queue = [node]
+        visited.add(node)
+        while queue:
+            current = queue.pop(0)
+            component.add(current)
+            for neighbour in graph[current]:
+                if neighbour not in visited:
+                    visited.add(neighbour)
+                    queue.append(neighbour)
+        components.append(component)
+
+    return components
