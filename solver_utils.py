@@ -132,3 +132,27 @@ def find_forced_moves(valid_configs: list) -> dict:
                 forced[i] = val
 
     return forced
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 – Divide & Conquer Logic
+# ---------------------------------------------------------------------------
+
+def build_constraint_graph(game) -> dict:
+    """Build an adjacency graph of unknown (EMPTY) cells on the player board.
+
+    Two EMPTY cells are connected if placing a tent in one could affect the
+    validity of placing a tent in the other.  Specifically, cells are
+    neighbours when they are within 8-way (King's move) distance of each
+    other, since tents may not touch even diagonally.
+
+    Args:
+        game: A :class:`TentsGame` instance whose ``player_grid`` reflects
+              the current solving state.
+
+    Returns:
+        Dict mapping each EMPTY cell ``(r, c)`` to a list of its EMPTY
+        8-way neighbours: ``{(r, c): [(nr, nc), ...]}``.
+    """
+    # TODO: Implement in Step 10 (neighbor logic).
+    raise NotImplementedError("build_constraint_graph not yet implemented")
