@@ -156,3 +156,18 @@ def build_constraint_graph(game) -> dict:
     """
     # TODO: Implement in Step 10 (neighbor logic).
     raise NotImplementedError("build_constraint_graph not yet implemented")
+
+
+def find_connected_components(graph: dict) -> list:
+    """Find connected components in the constraint graph via BFS.
+
+    Args:
+        graph: Adjacency dict from :func:`build_constraint_graph`.
+               ``{(r, c): [(nr, nc), ...]}``.
+
+    Returns:
+        List of sets, where each set contains the ``(r, c)`` tuples
+        belonging to one connected component.
+    """
+    # TODO: Implement in Step 11 (BFS/DFS components).
+    raise NotImplementedError("find_connected_components not yet implemented")

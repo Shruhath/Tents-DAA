@@ -1,5 +1,8 @@
 from tents import TentsGame, TREE, TENT, EMPTY, GRASS
-from solver_utils import solve_line_dp, find_forced_moves
+from solver_utils import (
+    solve_line_dp, find_forced_moves,
+    build_constraint_graph, find_connected_components,
+)
 
 def test_generation():
     print("Testing Level Generation...")
@@ -168,9 +171,59 @@ def test_dp_impossible_row():
     print("test_dp_impossible_row PASSED!")
 
 
+def test_connected_components():
+    """Step 9 – Graph decomposition: 5x5 board split by a GRASS wall.
+
+    Layout (col 2 is all GRASS, acting as a wall):
+        . . G . .
+        . . G . .
+        . . G . .
+        . . G . .
+        . . G . .
+
+    Expected: 2 connected components (Left: cols 0-1, Right: cols 3-4).
+    """
+    print("\nTesting Connected Components (5x5, GRASS wall at col 2)...")
+
+    game = TentsGame(size=5)
+    # Set up a player grid with a GRASS wall down column 2
+    for r in range(5):
+        for c in range(5):
+            if c == 2:
+                game.player_grid[r][c] = GRASS
+            else:
+                game.player_grid[r][c] = EMPTY
+
+    graph = build_constraint_graph(game)
+    components = find_connected_components(graph)
+
+    assert len(components) == 2, (
+        f"Expected 2 components, got {len(components)}"
+    )
+
+    # Verify left component contains only cols 0-1
+    # and right component contains only cols 3-4
+    all_cells = set()
+    for comp in components:
+        all_cells.update(comp)
+
+    left = {(r, c) for r in range(5) for c in range(2)}
+    right = {(r, c) for r in range(5) for c in range(3, 5)}
+
+    comp_sets = [comp for comp in components]
+    assert (comp_sets[0] == left and comp_sets[1] == right) or \
+           (comp_sets[0] == right and comp_sets[1] == left), (
+        f"Components don't match expected left/right split.\n"
+        f"  Got: {comp_sets}"
+    )
+
+    print("test_connected_components PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
     test_dp_simple_row()
     test_dp_zero_constraint()
     test_dp_impossible_row()
+    test_connected_components()
