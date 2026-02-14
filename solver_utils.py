@@ -6,6 +6,8 @@ Core utility functions for the SmartBot solver:
   - find_forced_moves: Intersection logic (deduces guaranteed placements)
 """
 
+from functools import lru_cache
+
 from tents import EMPTY, TREE, TENT, GRASS
 
 
@@ -37,72 +39,65 @@ def solve_line_dp(
         length *length* containing TENT or GRASS for every non-TREE cell.
         Returns an empty list if no valid configuration exists.
     """
-    results = []
+    # Pre-compute suffix tree counts for O(1) pruning
+    suffix_trees = [0] * (length + 1)
+    for i in range(length - 1, -1, -1):
+        suffix_trees[i] = suffix_trees[i + 1] + (1 if current_line[i] == TREE else 0)
 
-    def _recurse(index: int, placed: int, last_was_tent: bool, path: list):
+    @lru_cache(maxsize=None)
+    def _recurse(index: int, placed: int, last_was_tent: bool) -> tuple:
+        # Returns a tuple of valid suffix-tuples from this state onward.
         # Base case: reached end of line
         if index == length:
             if placed == target_count:
-                results.append(path[:])
-            return
+                return ((),)   # one valid (empty) suffix
+            return ()          # no valid suffixes
 
         cell = current_line[index]
 
         # TREE cells are kept as-is; they break tent adjacency
         if cell == TREE:
-            path.append(TREE)
-            _recurse(index + 1, placed, False, path)
-            path.pop()
-            return
+            suffixes = _recurse(index + 1, placed, False)
+            return tuple((TREE,) + s for s in suffixes)
 
         # Early prune: already placed too many tents
         if placed > target_count:
-            return
+            return ()
 
         # Early prune: not enough remaining cells to reach target
         remaining = length - index
-        # Count remaining TREE cells that can't hold tents
-        remaining_trees = sum(
-            1 for i in range(index, length) if current_line[i] == TREE
-        )
-        max_possible = placed + (remaining - remaining_trees)
+        max_possible = placed + (remaining - suffix_trees[index])
         if max_possible < target_count:
-            return
+            return ()
 
         # --- Fixed-position constraints (Step 4) ---
-        # If this cell is locked, we must respect its current value.
         if index in fixed_positions:
             forced = current_line[index]
             if forced == TENT:
-                # Must place TENT here (unless adjacency forbids it)
                 if last_was_tent:
-                    return  # Adjacency violation → no valid path
-                path.append(TENT)
-                _recurse(index + 1, placed + 1, True, path)
-                path.pop()
-                return
+                    return ()
+                suffixes = _recurse(index + 1, placed + 1, True)
+                return tuple((TENT,) + s for s in suffixes)
             elif forced == GRASS:
-                # Must place GRASS here
-                path.append(GRASS)
-                _recurse(index + 1, placed, False, path)
-                path.pop()
-                return
+                suffixes = _recurse(index + 1, placed, False)
+                return tuple((GRASS,) + s for s in suffixes)
 
         # --- Normal (non-fixed) cell choices ---
+        result = []
 
         # Option A: place TENT (only if last cell wasn't a tent)
         if not last_was_tent:
-            path.append(TENT)
-            _recurse(index + 1, placed + 1, True, path)
-            path.pop()
+            suffixes = _recurse(index + 1, placed + 1, True)
+            result.extend((TENT,) + s for s in suffixes)
 
         # Option B: place GRASS
-        path.append(GRASS)
-        _recurse(index + 1, placed, False, path)
-        path.pop()
+        suffixes = _recurse(index + 1, placed, False)
+        result.extend((GRASS,) + s for s in suffixes)
 
-    _recurse(0, 0, False, [])
-    return results
+        return tuple(result)
+
+    raw = _recurse(0, 0, False)
+    return [list(cfg) for cfg in raw]
 
 
 def find_forced_moves(valid_configs: list) -> dict:
