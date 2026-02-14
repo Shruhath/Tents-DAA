@@ -155,7 +155,26 @@ def build_constraint_graph(game) -> dict:
         8-way neighbours: ``{(r, c): [(nr, nc), ...]}``.
     """
     # TODO: Implement in Step 10 (neighbor logic).
-    raise NotImplementedError("build_constraint_graph not yet implemented")
+    size = game.size
+    graph = {}
+
+    # Collect all EMPTY cells as nodes
+    for r in range(size):
+        for c in range(size):
+            if game.player_grid[r][c] == EMPTY:
+                graph[(r, c)] = []
+
+    # Connect 8-way neighbours (King's move)
+    for (r, c) in graph:
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if (nr, nc) in graph:
+                    graph[(r, c)].append((nr, nc))
+
+    return graph
 
 
 def find_connected_components(graph: dict) -> list:
