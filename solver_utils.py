@@ -37,8 +37,51 @@ def solve_line_dp(
         length *length* containing TENT or GRASS for every non-TREE cell.
         Returns an empty list if no valid configuration exists.
     """
-    # TODO: Implement in Step 3 (DP recursion) and Step 4 (adjacency logic).
-    raise NotImplementedError("solve_line_dp not yet implemented")
+    results = []
+
+    def _recurse(index: int, placed: int, last_was_tent: bool, path: list):
+        # Base case: reached end of line
+        if index == length:
+            if placed == target_count:
+                results.append(path[:])
+            return
+
+        cell = current_line[index]
+
+        # TREE cells are kept as-is; they break tent adjacency
+        if cell == TREE:
+            path.append(TREE)
+            _recurse(index + 1, placed, False, path)
+            path.pop()
+            return
+
+        # Early prune: already placed too many tents
+        if placed > target_count:
+            return
+
+        # Early prune: not enough remaining cells to reach target
+        remaining = length - index
+        # Count remaining TREE cells that can't hold tents
+        remaining_trees = sum(
+            1 for i in range(index, length) if current_line[i] == TREE
+        )
+        max_possible = placed + (remaining - remaining_trees)
+        if max_possible < target_count:
+            return
+
+        # Option A: place TENT (only if last cell wasn't a tent)
+        if not last_was_tent:
+            path.append(TENT)
+            _recurse(index + 1, placed + 1, True, path)
+            path.pop()
+
+        # Option B: place GRASS
+        path.append(GRASS)
+        _recurse(index + 1, placed, False, path)
+        path.pop()
+
+    _recurse(0, 0, False, [])
+    return results
 
 
 def find_forced_moves(valid_configs: list) -> dict:
