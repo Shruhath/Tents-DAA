@@ -107,7 +107,70 @@ def test_dp_simple_row():
     print("test_dp_simple_row PASSED!")
 
 
+def test_dp_zero_constraint():
+    """Step 6 – 0-constraint row: 5 cells, 0 tents.
+
+    Only one valid configuration: all GRASS.
+    find_forced_moves should lock every cell as GRASS.
+    """
+    print("\nTesting DP Zero Constraint (5 cells, 0 tents)...")
+
+    configs = solve_line_dp(
+        length=5,
+        target_count=0,
+        current_line=[EMPTY] * 5,
+        fixed_positions=set(),
+    )
+
+    assert len(configs) == 1, (
+        f"Expected 1 valid config, got {len(configs)}"
+    )
+    assert configs[0] == [GRASS] * 5, (
+        f"Expected all GRASS, got {configs[0]}"
+    )
+
+    forced = find_forced_moves(configs)
+    assert len(forced) == 5, (
+        f"Expected 5 forced moves, got {len(forced)}"
+    )
+    for i in range(5):
+        assert forced[i] == GRASS, (
+            f"Cell {i} should be forced GRASS, got {forced[i]}"
+        )
+
+    print("test_dp_zero_constraint PASSED!")
+
+
+def test_dp_impossible_row():
+    """Step 6 – Impossible row: 3 cells, 3 tents.
+
+    Cannot fit 3 non-adjacent tents in 3 cells (max is 2: T G T).
+    solve_line_dp should return an empty list.
+    """
+    print("\nTesting DP Impossible Row (3 cells, 3 tents)...")
+
+    configs = solve_line_dp(
+        length=3,
+        target_count=3,
+        current_line=[EMPTY] * 3,
+        fixed_positions=set(),
+    )
+
+    assert configs == [], (
+        f"Expected empty list for impossible row, got {configs}"
+    )
+
+    forced = find_forced_moves(configs)
+    assert forced == {}, (
+        f"Expected empty dict for impossible row, got {forced}"
+    )
+
+    print("test_dp_impossible_row PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
     test_dp_simple_row()
+    test_dp_zero_constraint()
+    test_dp_impossible_row()
