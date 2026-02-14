@@ -69,6 +69,27 @@ def solve_line_dp(
         if max_possible < target_count:
             return
 
+        # --- Fixed-position constraints (Step 4) ---
+        # If this cell is locked, we must respect its current value.
+        if index in fixed_positions:
+            forced = current_line[index]
+            if forced == TENT:
+                # Must place TENT here (unless adjacency forbids it)
+                if last_was_tent:
+                    return  # Adjacency violation → no valid path
+                path.append(TENT)
+                _recurse(index + 1, placed + 1, True, path)
+                path.pop()
+                return
+            elif forced == GRASS:
+                # Must place GRASS here
+                path.append(GRASS)
+                _recurse(index + 1, placed, False, path)
+                path.pop()
+                return
+
+        # --- Normal (non-fixed) cell choices ---
+
         # Option A: place TENT (only if last cell wasn't a tent)
         if not last_was_tent:
             path.append(TENT)
