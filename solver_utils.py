@@ -122,5 +122,18 @@ def find_forced_moves(valid_configs: list) -> dict:
         Dict mapping cell index (int) → TENT or GRASS for every forced
         position.  Indices with no consensus are omitted.
     """
-    # TODO: Implement in Step 5 (intersection logic).
-    raise NotImplementedError("find_forced_moves not yet implemented")
+    if not valid_configs:
+        return {}
+
+    length = len(valid_configs[0])
+    forced = {}
+
+    for i in range(length):
+        values = {cfg[i] for cfg in valid_configs}
+        # If every config agrees on this cell, it's forced
+        if len(values) == 1:
+            val = values.pop()
+            if val in (TENT, GRASS):
+                forced[i] = val
+
+    return forced
