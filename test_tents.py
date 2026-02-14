@@ -1,4 +1,5 @@
-from tents import TentsGame, TREE, TENT, EMPTY
+from tents import TentsGame, TREE, TENT, EMPTY, GRASS
+from solver_utils import solve_line_dp, find_forced_moves
 
 def test_generation():
     print("Testing Level Generation...")
@@ -70,6 +71,43 @@ def test_validator(game):
 
     print("Validator Tests Passed!")
 
+def test_dp_simple_row():
+    """Step 2 – DP test: 4 cells, 2 tents, no fixed positions.
+
+    Expected valid configurations (no two tents adjacent):
+        1. T G T G
+        2. T G G T
+        3. G T G T
+    """
+    print("\nTesting DP Simple Row (4 cells, 2 tents)...")
+
+    configs = solve_line_dp(
+        length=4,
+        target_count=2,
+        current_line=[EMPTY] * 4,
+        fixed_positions=set(),
+    )
+
+    expected = [
+        [TENT, GRASS, TENT, GRASS],
+        [TENT, GRASS, GRASS, TENT],
+        [GRASS, TENT, GRASS, TENT],
+    ]
+
+    assert len(configs) == 3, (
+        f"Expected 3 valid configs, got {len(configs)}"
+    )
+
+    # Sort both lists so order doesn't matter
+    sort_key = lambda cfg: tuple(cfg)
+    assert sorted(configs, key=sort_key) == sorted(expected, key=sort_key), (
+        f"Configs mismatch!\n  Got:      {configs}\n  Expected: {expected}"
+    )
+
+    print("test_dp_simple_row PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
+    test_dp_simple_row()
