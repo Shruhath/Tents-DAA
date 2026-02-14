@@ -208,3 +208,111 @@ def find_connected_components(graph: dict) -> list:
         components.append(component)
 
     return components
+
+
+def _apply_dp_to_lines(game) -> bool:
+    """Run DP on every row and column, applying any forced moves found.
+
+    Returns True if at least one cell was changed on the player grid.
+    """
+    size = game.size
+    progress = False
+
+    # --- Rows ---
+    for r in range(size):
+        row = game.player_grid[r]
+        fixed = {c for c in range(size) if row[c] in (TENT, GRASS)}
+        target = game.row_constraints[r]
+
+        configs = solve_line_dp(size, target, row, fixed)
+        if not configs:
+            continue
+        forced = find_forced_moves(configs)
+        for c, val in forced.items():
+            if game.player_grid[r][c] == EMPTY:
+                game.player_grid[r][c] = val
+                progress = True
+
+    # --- Columns ---
+    for c in range(size):
+        col = [game.player_grid[r][c] for r in range(size)]
+        fixed = {r for r in range(size) if col[r] in (TENT, GRASS)}
+        target = game.col_constraints[c]
+
+        configs = solve_line_dp(size, target, col, fixed)
+        if not configs:
+            continue
+        forced = find_forced_moves(configs)
+        for r, val in forced.items():
+            if game.player_grid[r][c] == EMPTY:
+                game.player_grid[r][c] = val
+                progress = True
+
+    return progress
+
+
+def solve_with_dnc(game) -> bool:
+    """Divide & Conquer entry point.
+
+    1. Build the constraint graph of EMPTY cells.
+    2. Find connected components.
+    3. If multiple components exist, solve each independently by
+       restricting DP to the rows/columns each component touches.
+    4. If only one component (or no split possible), run DP on all
+       rows and columns.
+
+    Args:
+        game: A :class:`TentsGame` instance (modifies ``player_grid``
+              in place).
+
+    Returns:
+        True if any progress was made (at least one cell filled).
+    """
+    graph = build_constraint_graph(game)
+    if not graph:
+        return False  # No EMPTY cells left
+
+    components = find_connected_components(graph)
+
+    if len(components) <= 1:
+        # Single component – just run DP on all rows/cols
+        return _apply_dp_to_lines(game)
+
+    # Multiple components – solve rows/cols touched by each component
+    progress = False
+    for comp in components:
+        comp_rows = {r for r, c in comp}
+        comp_cols = {c for r, c in comp}
+        size = game.size
+
+        # DP on rows touched by this component
+        for r in comp_rows:
+            row = game.player_grid[r]
+            fixed = {c for c in range(size) if row[c] in (TENT, GRASS)}
+            target = game.row_constraints[r]
+
+            configs = solve_line_dp(size, target, row, fixed)
+            if not configs:
+                continue
+            forced = find_forced_moves(configs)
+            for c, val in forced.items():
+                if game.player_grid[r][c] == EMPTY:
+                    game.player_grid[r][c] = val
+                    progress = True
+
+        # DP on columns touched by this component
+        for c in comp_cols:
+            col = [game.player_grid[r][c] for r in range(size)]
+            fixed = {r for r in range(size) if col[r] in (TENT, GRASS)}
+            target = game.col_constraints[c]
+
+            configs = solve_line_dp(size, target, col, fixed)
+            if not configs:
+                continue
+            forced = find_forced_moves(configs)
+            for r, val in forced.items():
+                if game.player_grid[r][c] == EMPTY:
+                    game.player_grid[r][c] = val
+                    progress = True
+
+    return progress
