@@ -199,7 +199,14 @@ class SmartBot:
         dp_move = self._solve_rows_and_cols()
         if dp_move:
             r, c, val = dp_move
-            cells_scanned += self.size * self.size  # approximate DP work
+            cells_scanned += self.size * self.size
+            return (r, c, val, cells_scanned)
+
+        # --- D&C Decomposition (Step 17) ---
+        dnc_move = self._try_divide_and_conquer()
+        if dnc_move:
+            r, c, val = dnc_move
+            cells_scanned += self.size * self.size
             return (r, c, val, cells_scanned)
 
         return None
@@ -238,5 +245,27 @@ class SmartBot:
             for r, val in forced.items():
                 if self.game.player_grid[r][c] == EMPTY:
                     return (r, c, val)
+
+        return None
+
+    def _try_divide_and_conquer(self):
+        """Attempt D&C decomposition to break a deadlock.
+
+        Takes a snapshot of the grid, runs solve_with_dnc (which may fill
+        multiple cells), then reports back the first cell that changed.
+
+        Returns (r, c, TENT/GRASS) or None.
+        """
+        snapshot = [row[:] for row in self.game.player_grid]
+
+        progress = solve_with_dnc(self.game)
+        if not progress:
+            return None
+
+        # Find the first cell that changed
+        for r in range(self.size):
+            for c in range(self.size):
+                if self.game.player_grid[r][c] != snapshot[r][c]:
+                    return (r, c, self.game.player_grid[r][c])
 
         return None
