@@ -195,4 +195,48 @@ class SmartBot:
                         if (r, c) not in reserved:
                             return (r, c, GRASS, cells_scanned)
 
+        # --- DP Row/Col Solver (Step 16) ---
+        dp_move = self._solve_rows_and_cols()
+        if dp_move:
+            r, c, val = dp_move
+            cells_scanned += self.size * self.size  # approximate DP work
+            return (r, c, val, cells_scanned)
+
+        return None
+
+    def _solve_rows_and_cols(self):
+        """Run DP on every row and column, return the first forced move found.
+
+        Returns (r, c, TENT/GRASS) or None.
+        """
+        size = self.size
+
+        # --- Rows ---
+        for r in range(size):
+            row = self.game.player_grid[r]
+            fixed = {c for c in range(size) if row[c] in (TENT, GRASS)}
+            target = self.game.row_constraints[r]
+
+            configs = solve_line_dp(size, target, row, fixed)
+            if not configs:
+                continue
+            forced = find_forced_moves(configs)
+            for c, val in forced.items():
+                if self.game.player_grid[r][c] == EMPTY:
+                    return (r, c, val)
+
+        # --- Columns ---
+        for c in range(size):
+            col = [self.game.player_grid[r][c] for r in range(size)]
+            fixed = {r for r in range(size) if col[r] in (TENT, GRASS)}
+            target = self.game.col_constraints[c]
+
+            configs = solve_line_dp(size, target, col, fixed)
+            if not configs:
+                continue
+            forced = find_forced_moves(configs)
+            for r, val in forced.items():
+                if self.game.player_grid[r][c] == EMPTY:
+                    return (r, c, val)
+
         return None
