@@ -1,4 +1,6 @@
 from tents import TentsGame, TREE, TENT, EMPTY, GRASS
+from greedy_bot import GreedyBot
+from smart_bot import SmartBot
 from solver_utils import (
     solve_line_dp, find_forced_moves,
     build_constraint_graph, find_connected_components,
@@ -290,6 +292,72 @@ def test_split_board_dnc():
     print("test_split_board_dnc PASSED!")
 
 
+def test_smart_vs_greedy():
+    """Step 19 – Benchmark: SmartBot should solve >= what GreedyBot solves.
+
+    Generates 5 puzzles with a fixed seed.  For each, both bots get an
+    identical clone and solve iteratively.  SmartBot must fill at least as
+    many cells as GreedyBot on every puzzle.
+    """
+    import random
+    print("\nTesting Smart vs Greedy (5 seeded puzzles)...")
+
+    seed = 42
+    num_puzzles = 5
+    smart_wins = 0
+    ties = 0
+
+    for i in range(num_puzzles):
+        random.seed(seed + i)
+        game = TentsGame(size=8)
+        game.generate_level(10)
+
+        # Clone for each bot
+        greedy_game = game.clone_for_race()
+        smart_game = game.clone_for_race()
+
+        # --- Greedy ---
+        greedy_bot = GreedyBot(greedy_game)
+        greedy_moves = 0
+        while True:
+            move = greedy_bot.get_best_move()
+            if not move:
+                break
+            r, c, mt, _ = move
+            greedy_game.player_grid[r][c] = mt
+            greedy_moves += 1
+
+        greedy_empty = sum(
+            1 for r in range(8) for c in range(8)
+            if greedy_game.player_grid[r][c] == EMPTY
+        )
+
+        # --- Smart ---
+        smart_bot = SmartBot(smart_game)
+        smart_moves = smart_bot.solve_iteratively()
+
+        smart_empty = sum(
+            1 for r in range(8) for c in range(8)
+            if smart_game.player_grid[r][c] == EMPTY
+        )
+
+        print(f"  Puzzle {i+1}: Greedy={greedy_moves} moves ({greedy_empty} empty), "
+              f"Smart={smart_moves} moves ({smart_empty} empty)")
+
+        assert smart_empty <= greedy_empty, (
+            f"Puzzle {i+1}: SmartBot left MORE empty cells ({smart_empty}) "
+            f"than GreedyBot ({greedy_empty})!"
+        )
+
+        if smart_empty < greedy_empty:
+            smart_wins += 1
+        else:
+            ties += 1
+
+    print(f"  Summary: Smart wins={smart_wins}, Ties={ties}")
+    print("test_smart_vs_greedy PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -298,3 +366,4 @@ if __name__ == "__main__":
     test_dp_impossible_row()
     test_connected_components()
     test_split_board_dnc()
+    test_smart_vs_greedy()
