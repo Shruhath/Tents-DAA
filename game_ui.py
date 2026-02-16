@@ -259,18 +259,19 @@ class MenuScene:
 #  GAME SCENE
 class GameScene:
     def __init__(self, sm: SceneManager, assets: AssetManager,
-                 grid_size: int, mode: str):
+                 grid_size: int, mode: str, bot_class=None):
         self.sm = sm
         self.assets = assets
         self.grid_size = grid_size
-        self.mode = mode                     # "practice" | "versus"
+        self.mode = mode                     # "practice" | "versus" | "versus_smart"
 
-        #  game state 
+        #  game state
         self.player_game = TentsGame(size=grid_size)
         self.player_game.generate_level(TENT_COUNTS.get(grid_size, 10))
 
         self.bot_game = None
         self.bot = None
+        self.bot_name = "BOT"
         self.bot_stuck = False
         self.bot_thinking = False
         self.bot_thread = None
@@ -278,9 +279,15 @@ class GameScene:
         self.bot_last_scanned = 0
         self.last_bot_tick = 0
 
-        if mode == "versus":
+        if mode in ("versus", "versus_smart"):
             self.bot_game = self.player_game.clone_for_race()
-            self.bot = GreedyBot(self.bot_game)
+            if bot_class:
+                self.bot = bot_class(self.bot_game)
+            elif mode == "versus_smart":
+                self.bot = SmartBot(self.bot_game)
+            else:
+                self.bot = GreedyBot(self.bot_game)
+            self.bot_name = getattr(self.bot, "name", "BOT")
 
         self.wrong_clicks = 0
         self.start_time = time.time()
@@ -325,7 +332,7 @@ class GameScene:
     #  layout 
     def _calc_layout(self):
         n = self.grid_size
-        if self.mode == "versus":
+        if self.bot is not None:
             half = SCREEN_W // 2
             aw = half - 70
             ah = SCREEN_H - HEADER_H - LABEL_H - FOOTER_H - 20
@@ -460,7 +467,7 @@ class GameScene:
                                         self.p_bx, self.p_by)
 
         # Bot moves (threaded)
-        if self.mode == "versus" and not self.bot_stuck:
+        if self.bot is not None and not self.bot_stuck:
             now = pygame.time.get_ticks()
             if not self.bot_thinking and now - self.last_bot_tick >= BOT_MS:
                 self.bot_thinking = True
@@ -491,10 +498,10 @@ class GameScene:
             self.flashes.append({"board": "bot", "r": r, "c": c,
                                  "color": BLUE, "time": time.time()})
             if self.bot_game.check_victory():
-                self._end_game("GREEDY BOT")
+                self._end_game(self.bot_name)
         else:
             if self.bot_game.check_victory():
-                self._end_game("GREEDY BOT")
+                self._end_game(self.bot_name)
             else:
                 self.bot_stuck = True
 
@@ -504,7 +511,7 @@ class GameScene:
         self._draw_header(screen)
         self._draw_board(screen, self.player_game,
                          self.p_bx, self.p_by, is_player=True)
-        if self.mode == "versus":
+        if self.bot is not None:
             self._draw_board(screen, self.bot_game,
                              self.b_bx, self.b_by, is_player=False)
             # Divider line
@@ -531,7 +538,7 @@ class GameScene:
         screen.blit(ws, (20, 12))
 
         # Bot info (versus only)
-        if self.mode == "versus":
+        if self.bot is not None:
             bs = self.label_font.render(
                 f"Bot Scanned: {self.bot_last_scanned}", True, LGRAY)
             screen.blit(bs, (SCREEN_W - bs.get_width() - 20, 12))
@@ -548,9 +555,9 @@ class GameScene:
         yl = self.heading_font.render("YOU", True, GREEN)
         screen.blit(yl, yl.get_rect(center=(grid_center_x, self.p_by - 14)))
 
-        if self.mode == "versus":
+        if self.bot is not None:
             bot_cx = self.b_bx + CON_M + self.cell_size * self.grid_size // 2
-            lbl = "GREEDY BOT (STUCK)" if self.bot_stuck else "GREEDY BOT"
+            lbl = f"{self.bot_name} (STUCK)" if self.bot_stuck else self.bot_name
             col = ORANGE if self.bot_stuck else BLUE
             bl = self.heading_font.render(lbl, True, col)
             screen.blit(bl, bl.get_rect(center=(bot_cx, self.b_by - 14)))
@@ -661,7 +668,7 @@ class GameScene:
             if f["board"] == "player":
                 bx, by = self.p_bx, self.p_by
             else:
-                if self.mode != "versus":
+                if self.bot is None:
                     continue
                 bx, by = self.b_bx, self.b_by
             fx = bx + CON_M + f["c"] * self.cell_size
@@ -693,8 +700,8 @@ class GameScene:
             msg, col = "You Gave Up!", ORANGE
         elif self.winner == "YOU":
             msg, col = "YOU WIN!", GREEN
-        elif self.winner == "GREEDY BOT":
-            msg, col = "GREEDY BOT WINS!", BLUE
+        elif self.winner and self.winner != "NOBODY":
+            msg, col = f"{self.winner} WINS!", BLUE
         else:
             msg, col = "Game Over", WHITE
 
