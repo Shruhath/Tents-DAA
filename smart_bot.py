@@ -269,3 +269,30 @@ class SmartBot:
                     return (r, c, self.game.player_grid[r][c])
 
         return None
+
+    def solve_iteratively(self):
+        """Run the full solver loop until no more progress can be made.
+
+        Alternates between cheap greedy heuristics, DP row/col analysis,
+        and D&C decomposition (the "ping-pong" effect).  Each tier that
+        makes progress restarts the loop from the cheapest tier.
+
+        Returns the number of moves applied.
+        """
+        max_iterations = self.size * self.size * 4  # safety cap
+        moves_applied = 0
+
+        for _ in range(max_iterations):
+            # get_best_move already chains: greedy → DP → D&C
+            move = self.get_best_move()
+            if move:
+                r, c, mt, _ = move
+                if self.game.player_grid[r][c] == EMPTY:
+                    self.game.player_grid[r][c] = mt
+                moves_applied += 1
+                continue
+
+            # All tiers exhausted — stuck
+            break
+
+        return moves_applied
