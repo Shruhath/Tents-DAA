@@ -220,7 +220,8 @@ class MenuScene:
                                         self.grid_size, "versus"))
             elif self.smart_btn.clicked(ev.pos):
                 self.sm.switch(GameScene(self.sm, self.assets,
-                                        self.grid_size, "versus_smart"))
+                                        self.grid_size, "versus_smart",
+                                        bot_class=SmartBot))
 
     def update(self):
         pass
