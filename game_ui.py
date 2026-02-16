@@ -519,6 +519,9 @@ class GameScene:
             pygame.draw.line(screen, DGRAY,
                              (SCREEN_W // 2, HEADER_H),
                              (SCREEN_W // 2, SCREEN_H - FOOTER_H), 1)
+            # Thinking indicator on the bot board
+            if self.bot_thinking and not self.game_over:
+                self._draw_thinking(screen)
         self._draw_flashes(screen)
         self._draw_footer(screen)
         if self.game_over:
@@ -651,7 +654,37 @@ class GameScene:
             screen.blit(txt, txt.get_rect(
                 center=(bx + CON_M // 2, gy + r * cs + cs // 2)))
 
-    #  animation helpers 
+    #  animation helpers
+    def _draw_thinking(self, screen):
+        """Draw a pulsing 'Thinking...' badge on the bot's board."""
+        gx = self.b_bx + CON_M
+        gy = self.b_by + CON_M
+        gp = self.cell_size * self.grid_size
+
+        # Pulsing alpha
+        t = pygame.time.get_ticks()
+        pulse = abs((t % 1000) - 500) / 500.0  # 0..1..0
+        alpha = int(100 + 80 * pulse)
+
+        # Semi-transparent overlay on the board
+        ov = pygame.Surface((gp, gp), pygame.SRCALPHA)
+        ov.fill((0, 0, 0, 40))
+        screen.blit(ov, (gx, gy))
+
+        # Badge background
+        bw, bh = 160, 36
+        bx = gx + (gp - bw) // 2
+        by = gy + (gp - bh) // 2
+        badge = pygame.Surface((bw, bh), pygame.SRCALPHA)
+        badge.fill((30, 30, 30, alpha))
+        screen.blit(badge, (bx, by))
+        pygame.draw.rect(screen, BLUE, (bx, by, bw, bh), 2, border_radius=4)
+
+        # Text
+        dots = "." * ((t // 400) % 4)
+        txt = self.label_font.render(f"Thinking{dots}", True, BLUE)
+        screen.blit(txt, txt.get_rect(center=(bx + bw // 2, by + bh // 2)))
+
     def _active_pop(self, is_player, r, c):
         board = "player" if is_player else "bot"
         for p in self.pops:
