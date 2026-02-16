@@ -13,6 +13,7 @@ import time
 import threading
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
 from greedy_bot import GreedyBot
+from smart_bot import SmartBot
 
 #  CONSTANTS
 SCREEN_W, SCREEN_H = 1280, 720
@@ -192,13 +193,17 @@ class MenuScene:
             self.size_btns.append(b)
 
         # Mode buttons
-        mw, mh = 240, 50
-        mx = (SCREEN_W - 2 * mw - 30) // 2
+        mw, mh = 220, 50
+        gap = 20
+        total_w = 3 * mw + 2 * gap
+        mx = (SCREEN_W - total_w) // 2
         my = 420
         self.practice_btn = Button((mx, my, mw, mh),
                                    "Practice (Solo)", font=self.btn_font)
-        self.versus_btn   = Button((mx + mw + 30, my, mw, mh),
+        self.versus_btn   = Button((mx + mw + gap, my, mw, mh),
                                    "Versus Greedy", font=self.btn_font)
+        self.smart_btn    = Button((mx + 2 * (mw + gap), my, mw, mh),
+                                   "Versus Smart", font=self.btn_font)
 
     def handle_event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -213,6 +218,9 @@ class MenuScene:
             elif self.versus_btn.clicked(ev.pos):
                 self.sm.switch(GameScene(self.sm, self.assets,
                                         self.grid_size, "versus"))
+            elif self.smart_btn.clicked(ev.pos):
+                self.sm.switch(GameScene(self.sm, self.assets,
+                                        self.grid_size, "versus_smart"))
 
     def update(self):
         pass
@@ -242,6 +250,7 @@ class MenuScene:
 
         self.practice_btn.draw(screen)
         self.versus_btn.draw(screen)
+        self.smart_btn.draw(screen)
 
         hint = self.sub_font.render("ESC to quit", True, DGRAY)
         screen.blit(hint, hint.get_rect(center=(SCREEN_W // 2, SCREEN_H - 40)))
