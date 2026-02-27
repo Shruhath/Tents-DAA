@@ -1,6 +1,7 @@
 from tents import TentsGame, TREE, TENT, EMPTY, GRASS
 from greedy_bot import GreedyBot
 from smart_bot import SmartBot
+from back_bot import BackBot
 from solver_utils import (
     solve_line_dp, find_forced_moves,
     build_constraint_graph, find_connected_components,
@@ -358,6 +359,49 @@ def test_smart_vs_greedy():
     print("test_smart_vs_greedy PASSED!")
 
 
+def test_backbot_empty_board():
+    """Step 2 (Phase 3) – BackBot should solve a trivial 3x3 puzzle.
+
+    Layout:
+        . T .    row constraint 1
+        . . .    row constraint 0
+        . . .    row constraint 0
+       c0 c1 c2
+       col constraints: 1  0  0
+
+    Only valid solution: Tent at (0, 0).
+    The test currently fails (TDD red) because BackBot is a stub.
+    """
+    print("\nTesting BackBot Empty Board (3x3, 1 tree)...")
+
+    game = TentsGame(size=3)
+    game.player_grid = [
+        [EMPTY, TREE, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+    ]
+    game.trees = [(0, 1)]
+    game.row_constraints = [1, 0, 0]
+    game.col_constraints = [1, 0, 0]
+
+    bot = BackBot(game)
+    move = bot.get_best_move()
+
+    # BackBot must return a valid move
+    assert move is not None, "BackBot should return a move for a trivial puzzle"
+    r, c, mt, scanned = move
+    assert mt == TENT, f"Move type should be TENT, got {mt}"
+    assert game.is_move_legal(r, c, TENT), (
+        f"Move ({r},{c}) should be legal"
+    )
+    # The only correct tent placement is (0,0)
+    assert (r, c) == (0, 0), (
+        f"Expected tent at (0,0), got ({r},{c})"
+    )
+
+    print("test_backbot_empty_board PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -367,3 +411,4 @@ if __name__ == "__main__":
     test_connected_components()
     test_split_board_dnc()
     test_smart_vs_greedy()
+    test_backbot_empty_board()
