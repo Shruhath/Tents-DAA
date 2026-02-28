@@ -8,6 +8,7 @@ valid Tents puzzle.
 
 import copy
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
+from game_logger import GameLogger
 
 
 class BackBot:
@@ -16,6 +17,7 @@ class BackBot:
         self.size = game.size
         self.name = "BackBot (Backtracking)"
         self._solution = None  # Cached solved board
+        self.logger = GameLogger(self.size)
 
     def get_best_move(self):
         """Determine the next best move using backtracking search.
@@ -57,13 +59,14 @@ class BackBot:
     # Core naive backtracking (Step 3)
     # ------------------------------------------------------------------
 
-    def _solve_recursive(self, board_state, current_tree_index):
+    def _solve_recursive(self, board_state, current_tree_index, depth=0):
         """Core recursive backtracking function.
 
         Args:
             board_state: The current game grid being mutated in-place.
             current_tree_index: Index into self.game.trees for the next
                 tree to assign a tent to.
+            depth: Current recursion depth (for logging).
 
         Returns:
             True if a valid complete assignment was found, False otherwise.
@@ -72,7 +75,10 @@ class BackBot:
 
         # Base Case: every tree has been considered — verify the board.
         if current_tree_index == len(trees):
-            return self._is_board_valid(board_state)
+            valid = self._is_board_valid(board_state)
+            if valid:
+                self.logger.log_event("[SOLVED] All trees assigned successfully!")
+            return valid
 
         tree_r, tree_c = trees[current_tree_index]
 
@@ -80,7 +86,11 @@ class BackBot:
         # tree), skip it — the tree is already satisfied.
         for nr, nc in self.game._get_orthogonal_neighbors(tree_r, tree_c):
             if board_state[nr][nc] == TENT:
-                return self._solve_recursive(board_state, current_tree_index + 1)
+                self.logger.log_event(
+                    f"[HEURISTIC] Depth={depth} | Tree({tree_r},{tree_c}) "
+                    f"already satisfied by tent at ({nr},{nc}). Skipping."
+                )
+                return self._solve_recursive(board_state, current_tree_index + 1, depth)
 
         # Recursive Step: try placing a tent at each orthogonal neighbor.
         for nr, nc in self.game._get_orthogonal_neighbors(tree_r, tree_c):
@@ -92,13 +102,21 @@ class BackBot:
 
             # Place tent
             board_state[nr][nc] = TENT
+            self.logger.log_event(
+                f"[RECURSE] Depth={depth} | Placing TENT for "
+                f"Tree({tree_r},{tree_c}) at ({nr},{nc})."
+            )
 
             # Recurse to the next tree
-            if self._solve_recursive(board_state, current_tree_index + 1):
+            if self._solve_recursive(board_state, current_tree_index + 1, depth + 1):
                 return True
 
             # Backtrack: undo the placement
             board_state[nr][nc] = EMPTY
+            self.logger.log_event(
+                f"[UNDO] Depth={depth} | Removing TENT at ({nr},{nc}). "
+                f"Backtracking Tree({tree_r},{tree_c})."
+            )
 
         return False
 
