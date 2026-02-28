@@ -1,5 +1,6 @@
 log_*.txt
 __pycache__/
+/logs/
 *.md
 
 # Local dev tools
