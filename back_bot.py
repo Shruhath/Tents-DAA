@@ -33,7 +33,17 @@ class BackBot:
         # Solve once and cache
         if self._solution is None:
             board = copy.deepcopy(self.game.player_grid)
-            if self._solve_recursive(board, 0):
+
+            # Build remaining capacities (constraint minus tents already placed)
+            row_remaining = list(self.game.row_constraints)
+            col_remaining = list(self.game.col_constraints)
+            for r in range(self.size):
+                for c in range(self.size):
+                    if board[r][c] == TENT:
+                        row_remaining[r] -= 1
+                        col_remaining[c] -= 1
+
+            if self._solve_recursive(board, 0, 0, row_remaining, col_remaining):
                 self._solution = board
             else:
                 return None
@@ -56,26 +66,30 @@ class BackBot:
         return None
 
     # ------------------------------------------------------------------
-    # Core naive backtracking (Step 3)
+    # Core backtracking with forward checking (Steps 3 + 6)
     # ------------------------------------------------------------------
 
-    def _solve_recursive(self, board_state, current_tree_index, depth=0):
-        """Core recursive backtracking function.
+    def _solve_recursive(self, board_state, current_tree_index, depth,
+                         row_remaining, col_remaining):
+        """Core recursive backtracking function with forward checking.
 
         Args:
             board_state: The current game grid being mutated in-place.
             current_tree_index: Index into self.game.trees for the next
                 tree to assign a tent to.
             depth: Current recursion depth (for logging).
+            row_remaining: Mutable list — how many tents each row still needs.
+            col_remaining: Mutable list — how many tents each col still needs.
 
         Returns:
             True if a valid complete assignment was found, False otherwise.
         """
         trees = self.game.trees
 
-        # Base Case: every tree has been considered — verify the board.
+        # Base Case: every tree has been considered — verify capacities.
         if current_tree_index == len(trees):
-            valid = self._is_board_valid(board_state)
+            valid = (all(v == 0 for v in row_remaining)
+                     and all(v == 0 for v in col_remaining))
             if valid:
                 self.logger.log_event("[SOLVED] All trees assigned successfully!")
             return valid
@@ -90,7 +104,10 @@ class BackBot:
                     f"[HEURISTIC] Depth={depth} | Tree({tree_r},{tree_c}) "
                     f"already satisfied by tent at ({nr},{nc}). Skipping."
                 )
-                return self._solve_recursive(board_state, current_tree_index + 1, depth)
+                return self._solve_recursive(
+                    board_state, current_tree_index + 1, depth,
+                    row_remaining, col_remaining,
+                )
 
         # Recursive Step: try placing a tent at each orthogonal neighbor.
         for nr, nc in self.game._get_orthogonal_neighbors(tree_r, tree_c):
@@ -100,19 +117,32 @@ class BackBot:
             if not self._is_placement_safe(board_state, nr, nc):
                 continue
 
-            # Place tent
+            # Forward Checking: prune if row or col capacity exhausted
+            if row_remaining[nr] <= 0 or col_remaining[nc] <= 0:
+                continue
+
+            # Place tent and update capacities
             board_state[nr][nc] = TENT
+            row_remaining[nr] -= 1
+            col_remaining[nc] -= 1
             self.logger.log_event(
                 f"[RECURSE] Depth={depth} | Placing TENT for "
-                f"Tree({tree_r},{tree_c}) at ({nr},{nc})."
+                f"Tree({tree_r},{tree_c}) at ({nr},{nc}). "
+                f"Row {nr} remaining={row_remaining[nr]}, "
+                f"Col {nc} remaining={col_remaining[nc]}."
             )
 
             # Recurse to the next tree
-            if self._solve_recursive(board_state, current_tree_index + 1, depth + 1):
+            if self._solve_recursive(
+                board_state, current_tree_index + 1, depth + 1,
+                row_remaining, col_remaining,
+            ):
                 return True
 
-            # Backtrack: undo the placement
+            # Backtrack: undo placement and restore capacities
             board_state[nr][nc] = EMPTY
+            row_remaining[nr] += 1
+            col_remaining[nc] += 1
             self.logger.log_event(
                 f"[UNDO] Depth={depth} | Removing TENT at ({nr},{nc}). "
                 f"Backtracking Tree({tree_r},{tree_c})."
@@ -127,8 +157,8 @@ class BackBot:
     def _is_placement_safe(self, board_state, r, c):
         """Check the 8-neighbor adjacency rule (no tent touches another).
 
-        This is the only safety check in the naive version.  Row/col
-        capacity forward-checking will be added in Step 6.
+        Row/col capacity is now checked inline via forward checking
+        (Step 6) before this method is called.
         """
         for dr in range(-1, 2):
             for dc in range(-1, 2):
