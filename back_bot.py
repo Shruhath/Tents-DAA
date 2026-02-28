@@ -15,22 +15,41 @@ class BackBot:
         self.game = game
         self.size = game.size
         self.name = "BackBot (Backtracking)"
+        self._solution = None  # Cached solved board
 
     def get_best_move(self):
         """Determine the next best move using backtracking search.
 
+        Solves the full board once via backtracking, caches the result,
+        then diffs against the live player_grid to return one move at a
+        time.  TENT placements are returned before GRASS fills.
+
         Returns (r, c, move_type, cells_scanned) or None.
         """
-        # Work on a deep copy so the original board is untouched
-        board = copy.deepcopy(self.game.player_grid)
+        cells_scanned = 0
 
-        if self._solve_recursive(board, 0):
-            # Find the first tent the solver placed that isn't on the
-            # real board yet and return it as the next move.
-            for r in range(self.size):
-                for c in range(self.size):
-                    if board[r][c] == TENT and self.game.player_grid[r][c] == EMPTY:
-                        return (r, c, TENT, 0)
+        # Solve once and cache
+        if self._solution is None:
+            board = copy.deepcopy(self.game.player_grid)
+            if self._solve_recursive(board, 0):
+                self._solution = board
+            else:
+                return None
+
+        # Priority 1: return the first pending TENT placement
+        for r in range(self.size):
+            for c in range(self.size):
+                cells_scanned += 1
+                if (self.game.player_grid[r][c] == EMPTY
+                        and self._solution[r][c] == TENT):
+                    return (r, c, TENT, cells_scanned)
+
+        # Priority 2: fill remaining EMPTY cells as GRASS
+        for r in range(self.size):
+            for c in range(self.size):
+                cells_scanned += 1
+                if self.game.player_grid[r][c] == EMPTY:
+                    return (r, c, GRASS, cells_scanned)
 
         return None
 
