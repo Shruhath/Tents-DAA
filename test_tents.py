@@ -402,6 +402,68 @@ def test_backbot_empty_board():
     print("test_backbot_empty_board PASSED!")
 
 
+def test_backbot_constraints():
+    """Step 5 (Phase 3) – BackBot must reject impossible puzzles.
+
+    Scenario A – Row capacity violation:
+        . T .    row constraint 0
+        . . .    row constraint 0
+        . . .    row constraint 0
+       col constraints: 0  0  0
+
+    Tree at (0,1) needs a tent, but every row and column
+    constraint is 0.  No tent can be legally placed.
+
+    Scenario B – Adjacency impossibility:
+        T T .    row constraint 0
+        . . .    row constraint 2
+        . . .    row constraint 0
+       col constraints: 1  1  0
+
+    Trees at (0,0) and (0,1).  Row 0 = 0 forces both tents
+    into row 1: (1,0) and (1,1).  Those cells are horizontally
+    adjacent, violating the no-touching rule.  No solution exists.
+    """
+    print("\nTesting BackBot Constraints (impossible puzzles)...")
+
+    # --- Scenario A: Row/Col capacity makes placement impossible ---
+    game_a = TentsGame(size=3)
+    game_a.player_grid = [
+        [EMPTY, TREE, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+    ]
+    game_a.trees = [(0, 1)]
+    game_a.row_constraints = [0, 0, 0]
+    game_a.col_constraints = [0, 0, 0]
+
+    bot_a = BackBot(game_a)
+    assert bot_a.get_best_move() is None, (
+        "Scenario A: BackBot should return None when all constraints are 0"
+    )
+    print("  Scenario A (capacity violation) PASSED")
+
+    # --- Scenario B: Adjacency makes placement impossible ---
+    game_b = TentsGame(size=3)
+    game_b.player_grid = [
+        [TREE, TREE, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+        [EMPTY, EMPTY, EMPTY],
+    ]
+    game_b.trees = [(0, 0), (0, 1)]
+    game_b.row_constraints = [0, 2, 0]
+    game_b.col_constraints = [1, 1, 0]
+
+    bot_b = BackBot(game_b)
+    assert bot_b.get_best_move() is None, (
+        "Scenario B: BackBot should return None when adjacency "
+        "prevents a valid assignment"
+    )
+    print("  Scenario B (adjacency impossibility) PASSED")
+
+    print("test_backbot_constraints PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -412,3 +474,4 @@ if __name__ == "__main__":
     test_split_board_dnc()
     test_smart_vs_greedy()
     test_backbot_empty_board()
+    test_backbot_constraints()
