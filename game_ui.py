@@ -538,7 +538,7 @@ class GameScene:
         self.bot_move_result = None
         if move:
             # Start trace replay if slow-mo is enabled and trace available
-            if self.slow_mo and self.bot.has_trace():
+            if self.slow_mo and hasattr(self.bot, 'has_trace') and self.bot.has_trace():
                 self.trace_board = [row[:] for row in self.bot._trace_board]
                 self.trace_active = True
                 self.last_bot_tick = pygame.time.get_ticks()
@@ -860,29 +860,33 @@ def _brighten(color, amount):
 
 #  MAIN
 def main():
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
-    pygame.display.set_caption("Tents Game")
-    clock = pygame.time.Clock()
+    try:
+        pygame.init()
+        screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+        pygame.display.set_caption("Tents Game")
+        clock = pygame.time.Clock()
 
-    assets = AssetManager()
-    sm = SceneManager()
-    sm.switch(MenuScene(sm, assets))
+        assets = AssetManager()
+        sm = SceneManager()
+        sm.switch(MenuScene(sm, assets))
 
-    while True:
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                if isinstance(sm.scene, MenuScene):
+        while True:
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-            sm.handle(ev)
-        sm.update()
-        sm.draw(screen)
-        pygame.display.flip()
-        clock.tick(FPS)
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                    if isinstance(sm.scene, MenuScene):
+                        pygame.quit()
+                        sys.exit()
+                sm.handle(ev)
+            sm.update()
+            sm.draw(screen)
+            pygame.display.flip()
+            clock.tick(FPS)
+    except KeyboardInterrupt:
+        pygame.quit()
+        sys.exit()
 
 
 if __name__ == "__main__":
