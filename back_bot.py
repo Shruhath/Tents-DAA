@@ -43,7 +43,8 @@ class BackBot:
                         row_remaining[r] -= 1
                         col_remaining[c] -= 1
 
-            if self._solve_recursive(board, 0, 0, row_remaining, col_remaining):
+            if self._solve_recursive(board, list(self.game.trees), 0,
+                                     row_remaining, col_remaining):
                 self._solution = board
             else:
                 return None
@@ -66,17 +67,16 @@ class BackBot:
         return None
 
     # ------------------------------------------------------------------
-    # Core backtracking with forward checking (Steps 3 + 6 + 7)
+    # Core backtracking with MRV + forward checking (Steps 3–7, 11)
     # ------------------------------------------------------------------
 
-    def _solve_recursive(self, board_state, current_tree_index, depth,
+    def _solve_recursive(self, board_state, remaining_trees, depth,
                          row_remaining, col_remaining):
-        """Core recursive backtracking function with forward checking.
+        """Core recursive backtracking with MRV heuristic.
 
         Args:
             board_state: The current game grid being mutated in-place.
-            current_tree_index: Index into self.game.trees for the next
-                tree to assign a tent to.
+            remaining_trees: List of (r, c) trees not yet assigned.
             depth: Current recursion depth (for logging).
             row_remaining: Mutable list — how many tents each row still needs.
             col_remaining: Mutable list — how many tents each col still needs.
@@ -84,32 +84,40 @@ class BackBot:
         Returns:
             True if a valid complete assignment was found, False otherwise.
         """
-        trees = self.game.trees
-
-        # Base Case: every tree has been considered — verify capacities.
-        if current_tree_index == len(trees):
+        # Base Case: no remaining trees — verify capacities.
+        if not remaining_trees:
             valid = (all(v == 0 for v in row_remaining)
                      and all(v == 0 for v in col_remaining))
             if valid:
                 self.logger.log_event("[SOLVED] All trees assigned successfully!")
             return valid
 
-        tree_r, tree_c = trees[current_tree_index]
-
-        # If this tree already has an adjacent tent (placed for a prior
-        # tree), skip it — the tree is already satisfied.
-        for nr, nc in self.game._get_orthogonal_neighbors(tree_r, tree_c):
-            if board_state[nr][nc] == TENT:
+        # MRV: compute domain sizes and pick the most constrained tree.
+        best_tree = None
+        best_domain = 5  # larger than max possible (4)
+        for tree in remaining_trees:
+            ds = self._get_domain_size(tree, board_state,
+                                       row_remaining, col_remaining)
+            # Domain 0 → immediate dead end
+            if ds == 0:
                 self.logger.log_event(
-                    f"[HEURISTIC] Depth={depth} | Tree({tree_r},{tree_c}) "
-                    f"already satisfied by tent at ({nr},{nc}). Skipping."
+                    f"[DEAD END] Depth={depth} | Tree({tree[0]},{tree[1]}) "
+                    f"has domain=0. Backtracking."
                 )
-                return self._solve_recursive(
-                    board_state, current_tree_index + 1, depth,
-                    row_remaining, col_remaining,
-                )
+                return False
+            if ds < best_domain:
+                best_domain = ds
+                best_tree = tree
 
-        # Recursive Step: try placing a tent at each orthogonal neighbor.
+        tree_r, tree_c = best_tree
+        next_remaining = [t for t in remaining_trees if t != best_tree]
+
+        self.logger.log_event(
+            f"[MRV] Depth={depth} | Selected Tree({tree_r},{tree_c}) "
+            f"(domain={best_domain})."
+        )
+
+        # Branch on the MRV tree's valid neighbours.
         for nr, nc in self.game._get_orthogonal_neighbors(tree_r, tree_c):
             if board_state[nr][nc] != EMPTY:
                 continue
@@ -137,9 +145,9 @@ class BackBot:
                 f"Grassed {len(grassed)} neighbours."
             )
 
-            # Recurse to the next tree
+            # Recurse with remaining trees
             if self._solve_recursive(
-                board_state, current_tree_index + 1, depth + 1,
+                board_state, next_remaining, depth + 1,
                 row_remaining, col_remaining,
             ):
                 return True
