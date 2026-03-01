@@ -14,6 +14,7 @@ import threading
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
 from greedy_bot import GreedyBot
 from smart_bot import SmartBot
+from back_bot import BackBot
 
 #  CONSTANTS
 SCREEN_W, SCREEN_H = 1280, 720
@@ -193,9 +194,9 @@ class MenuScene:
             self.size_btns.append(b)
 
         # Mode buttons
-        mw, mh = 220, 50
-        gap = 20
-        total_w = 3 * mw + 2 * gap
+        mw, mh = 200, 50
+        gap = 15
+        total_w = 4 * mw + 3 * gap
         mx = (SCREEN_W - total_w) // 2
         my = 420
         self.practice_btn = Button((mx, my, mw, mh),
@@ -204,6 +205,8 @@ class MenuScene:
                                    "Versus Greedy", font=self.btn_font)
         self.smart_btn    = Button((mx + 2 * (mw + gap), my, mw, mh),
                                    "Versus Smart", font=self.btn_font)
+        self.back_btn     = Button((mx + 3 * (mw + gap), my, mw, mh),
+                                   "Versus BackBot", font=self.btn_font)
 
     def handle_event(self, ev):
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -222,6 +225,10 @@ class MenuScene:
                 self.sm.switch(GameScene(self.sm, self.assets,
                                         self.grid_size, "versus_smart",
                                         bot_class=SmartBot))
+            elif self.back_btn.clicked(ev.pos):
+                self.sm.switch(GameScene(self.sm, self.assets,
+                                        self.grid_size, "versus_back",
+                                        bot_class=BackBot))
 
     def update(self):
         pass
@@ -252,6 +259,7 @@ class MenuScene:
         self.practice_btn.draw(screen)
         self.versus_btn.draw(screen)
         self.smart_btn.draw(screen)
+        self.back_btn.draw(screen)
 
         hint = self.sub_font.render("ESC to quit", True, DGRAY)
         screen.blit(hint, hint.get_rect(center=(SCREEN_W // 2, SCREEN_H - 40)))
@@ -264,7 +272,7 @@ class GameScene:
         self.sm = sm
         self.assets = assets
         self.grid_size = grid_size
-        self.mode = mode                     # "practice" | "versus" | "versus_smart"
+        self.mode = mode                     # "practice" | "versus" | "versus_smart" | "versus_back"
 
         #  game state
         self.player_game = TentsGame(size=grid_size)
@@ -280,7 +288,7 @@ class GameScene:
         self.bot_last_scanned = 0
         self.last_bot_tick = 0
 
-        if mode in ("versus", "versus_smart"):
+        if mode in ("versus", "versus_smart", "versus_back"):
             self.bot_game = self.player_game.clone_for_race()
             if bot_class:
                 self.bot = bot_class(self.bot_game)
