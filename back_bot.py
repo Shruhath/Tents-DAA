@@ -8,6 +8,7 @@ valid Tents puzzle.
 
 import copy
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
+from smart_bot import SmartBot
 from game_logger import GameLogger
 
 
@@ -21,11 +22,16 @@ class BackBot:
         self.logger = GameLogger(self.size)
 
     def get_best_move(self):
-        """Determine the next best move using backtracking search.
+        """Determine the next best move using hybrid greedy + backtracking.
 
-        Solves the full board once via backtracking, caches the result,
-        then diffs against the live player_grid to return one move at a
-        time.  TENT placements are returned before GRASS fills.
+        Phase A: Apply SmartBot's O(M) greedy heuristics to reduce the
+        board — filling forced TENT and GRASS cells.
+        Phase B: Compile a list of unresolved trees (those without an
+        adjacent tent after greedy) and pass the shrunk board to
+        the backtracking solver.
+
+        Results are cached; subsequent calls diff the cached solution
+        against the live player_grid.
 
         Returns (r, c, move_type, cells_scanned) or None.
         """
@@ -35,7 +41,37 @@ class BackBot:
         if self._solution is None:
             board = copy.deepcopy(self.game.player_grid)
 
-            # Build remaining capacities (constraint minus tents already placed)
+            # --- Phase A: Greedy Pre-processing ---
+            greedy_game = TentsGame(size=self.size)
+            greedy_game.player_grid = board
+            greedy_game.solution_grid = self.game.solution_grid
+            greedy_game.trees = list(self.game.trees)
+            greedy_game.row_constraints = list(self.game.row_constraints)
+            greedy_game.col_constraints = list(self.game.col_constraints)
+
+            greedy_bot = SmartBot(greedy_game)
+            greedy_moves = greedy_bot.solve_iteratively()
+            self.logger.log_event(
+                f"[GREEDY] Pre-processing applied {greedy_moves} forced moves."
+            )
+
+            # --- Phase B: Identify unresolved trees ---
+            remaining_trees = []
+            for tr, tc in self.game.trees:
+                satisfied = False
+                for nr, nc in self.game._get_orthogonal_neighbors(tr, tc):
+                    if board[nr][nc] == TENT:
+                        satisfied = True
+                        break
+                if not satisfied:
+                    remaining_trees.append((tr, tc))
+
+            self.logger.log_event(
+                f"[BACKTRACK] {len(remaining_trees)} trees unresolved "
+                f"(of {len(self.game.trees)} total). Starting backtracking."
+            )
+
+            # Build remaining capacities from the greedy-processed board
             row_remaining = list(self.game.row_constraints)
             col_remaining = list(self.game.col_constraints)
             for r in range(self.size):
@@ -44,8 +80,15 @@ class BackBot:
                         row_remaining[r] -= 1
                         col_remaining[c] -= 1
 
-            if self._solve_recursive(board, list(self.game.trees), 0,
-                                     row_remaining, col_remaining):
+            if not remaining_trees:
+                # Greedy solved everything — verify constraints
+                if (all(v == 0 for v in row_remaining)
+                        and all(v == 0 for v in col_remaining)):
+                    self._solution = board
+                else:
+                    return None
+            elif self._solve_recursive(board, remaining_trees, 0,
+                                       row_remaining, col_remaining):
                 self._solution = board
             else:
                 return None
