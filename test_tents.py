@@ -499,6 +499,75 @@ def test_backbot_performance():
     print("test_backbot_performance PASSED!")
 
 
+def test_backbot_vs_greedy():
+    """Step 13 (Phase 3) – BackBot vs GreedyBot on 5 seeded 8x8 puzzles.
+
+    Both bots should solve every puzzle (0 empty cells).  BackBot
+    should never leave more empty cells than Greedy.
+    """
+    import random
+
+    print("\nTesting BackBot vs Greedy (5 seeded 8x8 puzzles)...")
+    back_wins = 0
+    ties = 0
+
+    for i in range(5):
+        random.seed(i * 7 + 100)
+        game = TentsGame(size=8)
+        game.generate_level(10)  # 8x8 = 10 tents
+
+        greedy_game = game.clone_for_race()
+        back_game = game.clone_for_race()
+
+        # --- Greedy ---
+        greedy_bot = GreedyBot(greedy_game)
+        greedy_moves = 0
+        while True:
+            move = greedy_bot.get_best_move()
+            if not move:
+                break
+            r, c, mt, _ = move
+            greedy_game.player_grid[r][c] = mt
+            greedy_moves += 1
+
+        greedy_empty = sum(
+            1 for r in range(8) for c in range(8)
+            if greedy_game.player_grid[r][c] == EMPTY
+        )
+
+        # --- BackBot ---
+        back_bot = BackBot(back_game)
+        back_moves = 0
+        while True:
+            move = back_bot.get_best_move()
+            if not move:
+                break
+            r, c, mt, _ = move
+            back_game.player_grid[r][c] = mt
+            back_moves += 1
+
+        back_empty = sum(
+            1 for r in range(8) for c in range(8)
+            if back_game.player_grid[r][c] == EMPTY
+        )
+
+        print(f"  Puzzle {i+1}: Greedy={greedy_moves} moves ({greedy_empty} empty), "
+              f"BackBot={back_moves} moves ({back_empty} empty)")
+
+        assert back_empty == 0, (
+            f"Puzzle {i+1}: BackBot left {back_empty} empty cells "
+            f"(should solve completely)"
+        )
+
+        if back_empty < greedy_empty:
+            back_wins += 1
+        else:
+            ties += 1
+
+    print(f"  Summary: BackBot wins={back_wins}, Ties={ties}")
+    print("test_backbot_vs_greedy PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -511,3 +580,4 @@ if __name__ == "__main__":
     test_backbot_empty_board()
     test_backbot_constraints()
     test_backbot_performance()
+    test_backbot_vs_greedy()
