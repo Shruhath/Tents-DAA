@@ -464,6 +464,41 @@ def test_backbot_constraints():
     print("test_backbot_constraints PASSED!")
 
 
+def test_backbot_performance():
+    """Step 9 (Phase 3) – BackBot must solve a 10x10 puzzle under 2 seconds.
+
+    Generates a seeded 10x10 puzzle (15 tents) and runs BackBot on it.
+    Asserts the solver finishes within 2.0 seconds and actually finds
+    a valid move.  Without MRV, this test may time out.
+    """
+    import random
+    import time
+
+    print("\nTesting BackBot Performance (10x10, 15 tents)...")
+
+    random.seed(123)
+    game = TentsGame(size=10)
+    game.generate_level(15)
+
+    bot = BackBot(game)
+
+    start = time.time()
+    move = bot.get_best_move()
+    elapsed = time.time() - start
+
+    print(f"  Solved in {elapsed:.3f}s")
+
+    assert move is not None, "BackBot should find a move for a valid 10x10 puzzle"
+    r, c, mt, _ = move
+    assert mt == TENT, f"First move should be TENT, got {mt}"
+
+    assert elapsed < 2.0, (
+        f"BackBot took {elapsed:.3f}s on 10x10 — exceeds 2.0s limit"
+    )
+
+    print("test_backbot_performance PASSED!")
+
+
 if __name__ == "__main__":
     g = test_generation()
     test_validator(g)
@@ -475,3 +510,4 @@ if __name__ == "__main__":
     test_smart_vs_greedy()
     test_backbot_empty_board()
     test_backbot_constraints()
+    test_backbot_performance()
