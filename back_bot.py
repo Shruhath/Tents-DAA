@@ -66,7 +66,7 @@ class BackBot:
         return None
 
     # ------------------------------------------------------------------
-    # Core backtracking with forward checking (Steps 3 + 6)
+    # Core backtracking with forward checking (Steps 3 + 6 + 7)
     # ------------------------------------------------------------------
 
     def _solve_recursive(self, board_state, current_tree_index, depth,
@@ -125,11 +125,16 @@ class BackBot:
             board_state[nr][nc] = TENT
             row_remaining[nr] -= 1
             col_remaining[nc] -= 1
+
+            # Adjacency propagation: mark 8 neighbours as GRASS
+            grassed = self._mark_neighbors_grass(board_state, nr, nc)
+
             self.logger.log_event(
                 f"[RECURSE] Depth={depth} | Placing TENT for "
                 f"Tree({tree_r},{tree_c}) at ({nr},{nc}). "
                 f"Row {nr} remaining={row_remaining[nr]}, "
-                f"Col {nc} remaining={col_remaining[nc]}."
+                f"Col {nc} remaining={col_remaining[nc]}. "
+                f"Grassed {len(grassed)} neighbours."
             )
 
             # Recurse to the next tree
@@ -139,12 +144,14 @@ class BackBot:
             ):
                 return True
 
-            # Backtrack: undo placement and restore capacities
+            # Backtrack: undo GRASS neighbours, placement, and capacities
+            self._restore_neighbors(board_state, grassed)
             board_state[nr][nc] = EMPTY
             row_remaining[nr] += 1
             col_remaining[nc] += 1
             self.logger.log_event(
                 f"[UNDO] Depth={depth} | Removing TENT at ({nr},{nc}). "
+                f"Restored {len(grassed)} neighbours. "
                 f"Backtracking Tree({tree_r},{tree_c})."
             )
 
@@ -169,6 +176,29 @@ class BackBot:
                     if board_state[nr][nc] == TENT:
                         return False
         return True
+
+    def _mark_neighbors_grass(self, board_state, r, c):
+        """Mark the 8 neighbours of (r, c) as GRASS if they are EMPTY.
+
+        Returns a list of (row, col) cells that were changed so the
+        caller can undo them on backtrack.
+        """
+        grassed = []
+        for dr in range(-1, 2):
+            for dc in range(-1, 2):
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.size and 0 <= nc < self.size:
+                    if board_state[nr][nc] == EMPTY:
+                        board_state[nr][nc] = GRASS
+                        grassed.append((nr, nc))
+        return grassed
+
+    def _restore_neighbors(self, board_state, grassed):
+        """Undo a previous _mark_neighbors_grass call."""
+        for gr, gc in grassed:
+            board_state[gr][gc] = EMPTY
 
     def _is_board_valid(self, board_state):
         """Verify that all row and column constraints are exactly met."""
