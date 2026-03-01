@@ -57,6 +57,11 @@ class BackBot:
             self.logger.log_event(
                 f"[GREEDY] Pre-processing applied {greedy_moves} forced moves."
             )
+            if greedy_moves > 0:
+                self.logger.log_board(
+                    board, self.game.row_constraints,
+                    f"Greedy Pre-processing ({greedy_moves} moves)",
+                    self.game.col_constraints)
 
             # --- Phase B: Identify unresolved trees ---
             remaining_trees = []
@@ -200,6 +205,10 @@ class BackBot:
                 f"Col {nc} remaining={col_remaining[nc]}. "
                 f"Grassed {len(grassed)} neighbours."
             )
+            self.logger.log_board(
+                board_state, row_remaining,
+                f"Recursive Guess for Tree({tree_r},{tree_c}) at ({nr},{nc})",
+                col_remaining)
 
             # Recurse with remaining trees
             if self._solve_recursive(
@@ -219,6 +228,10 @@ class BackBot:
                 f"Restored {len(grassed)} neighbours. "
                 f"Backtracking Tree({tree_r},{tree_c})."
             )
+            self.logger.log_board(
+                board_state, row_remaining,
+                f"Backtrack Undo for Tree({tree_r},{tree_c}) at ({nr},{nc})",
+                col_remaining)
 
         return False
 
