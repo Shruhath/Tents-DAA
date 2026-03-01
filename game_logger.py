@@ -48,27 +48,49 @@ class GameLogger:
         """Log a single-line event message."""
         self.logger.info(msg)
 
-    def log_board(self, board, row_constraints, reason: str):
+    def log_board(self, board, row_constraints, reason: str,
+                  col_constraints=None):
         """Render the full ASCII board grid into the log file.
 
         Args:
             board: 2-D list (size x size) of cell values.
             row_constraints: list of per-row tent targets.
             reason: human-readable label for why the snapshot was taken.
+            col_constraints: optional list of per-col tent targets.
         """
         size = self.board_size
         self.logger.info(f"--- Board After: {reason} ---")
 
-        # Column header
-        col_header = "     " + "  ".join(f"C{c}" for c in range(size))
+        # Column constraint header
+        if col_constraints is not None:
+            col_vals = "  ".join(f"{col_constraints[c]:>2}" for c in range(size))
+            self.logger.info(f"       {col_vals}")
+
+        # Column index header
+        col_header = "       " + "  ".join(f"C{c}" for c in range(size))
         self.logger.info(col_header)
 
         # Each row with its constraint
         for r in range(size):
             row_str = "  ".join(
-                _SYMBOL.get(board[r][c], '?') for c in range(size)
+                f" {_SYMBOL.get(board[r][c], '?')}" for c in range(size)
             )
             target = row_constraints[r]
-            self.logger.info(f"  R{r}: {row_str}   (need={target})")
+            self.logger.info(f"  R{r}: {row_str}  | {target}")
 
         self.logger.info("")
+
+    def log_game_summary(self, total_steps: int, backtracks: int,
+                         time_elapsed: float):
+        """Log a final summary line at the end of a solve run.
+
+        Args:
+            total_steps: Total recursive calls made.
+            backtracks: Number of undo/backtrack events.
+            time_elapsed: Wall-clock seconds for the solve.
+        """
+        self.logger.info(
+            f"[SUMMARY] Steps={total_steps}, Backtracks={backtracks}, "
+            f"Time={time_elapsed:.4f}s"
+        )
+        self.logger.info("=" * 60)
