@@ -621,6 +621,20 @@ class GameScene:
             ch.fill((255, 255, 100, 30))
             screen.blit(ch, (gx + hc * cs, gy))
 
+        # Bot focus-tree highlight (yellow aura)
+        if not is_player and self.bot is not None:
+            ft = getattr(self.bot, "focus_tree", None)
+            if ft is not None:
+                fr, fc = ft
+                fx = gx + fc * cs
+                fy = gy + fr * cs
+                aura = pygame.Surface((cs + 6, cs + 6), pygame.SRCALPHA)
+                aura.fill((255, 255, 0, 60))
+                screen.blit(aura, (fx - 3, fy - 3))
+                pygame.draw.rect(screen, (255, 255, 0),
+                                 (fx - 1, fy - 1, cs + 2, cs + 2), 2,
+                                 border_radius=2)
+
         # Grid lines
         for i in range(n + 1):
             pygame.draw.line(screen, LGRAY,

@@ -17,6 +17,7 @@ class BackBot:
         self.size = game.size
         self.name = "BackBot (Backtracking)"
         self._solution = None  # Cached solved board
+        self.focus_tree = None  # (r, c) of tree the bot is currently working on
         self.logger = GameLogger(self.size)
 
     def get_best_move(self):
@@ -55,6 +56,7 @@ class BackBot:
                 cells_scanned += 1
                 if (self.game.player_grid[r][c] == EMPTY
                         and self._solution[r][c] == TENT):
+                    self.focus_tree = self._find_paired_tree(r, c)
                     return (r, c, TENT, cells_scanned)
 
         # Priority 2: fill remaining EMPTY cells as GRASS
@@ -62,8 +64,10 @@ class BackBot:
             for c in range(self.size):
                 cells_scanned += 1
                 if self.game.player_grid[r][c] == EMPTY:
+                    self.focus_tree = None
                     return (r, c, GRASS, cells_scanned)
 
+        self.focus_tree = None
         return None
 
     # ------------------------------------------------------------------
@@ -207,6 +211,14 @@ class BackBot:
         """Undo a previous _mark_neighbors_grass call."""
         for gr, gc in grassed:
             board_state[gr][gc] = EMPTY
+
+    def _find_paired_tree(self, tent_r, tent_c):
+        """Return the (r, c) of the tree orthogonally adjacent to a tent."""
+        for tr, tc in self.game.trees:
+            for nr, nc in self.game._get_orthogonal_neighbors(tr, tc):
+                if nr == tent_r and nc == tent_c:
+                    return (tr, tc)
+        return None
 
     def _get_domain_size(self, tree, board_state, row_remaining, col_remaining):
         """Return the number of legally available spots for *tree*'s tent.
