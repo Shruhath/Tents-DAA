@@ -200,6 +200,33 @@ class BackBot:
         for gr, gc in grassed:
             board_state[gr][gc] = EMPTY
 
+    def _get_domain_size(self, tree, board_state, row_remaining, col_remaining):
+        """Return the number of legally available spots for *tree*'s tent.
+
+        A spot counts if it is EMPTY, passes the 8-neighbor adjacency
+        check, and its row/col still has remaining capacity.
+
+        Args:
+            tree: (row, col) of the tree.
+            board_state: Current game grid.
+            row_remaining: Remaining tent capacity per row.
+            col_remaining: Remaining tent capacity per col.
+
+        Returns:
+            Integer 0–4.
+        """
+        tr, tc = tree
+        count = 0
+        for nr, nc in self.game._get_orthogonal_neighbors(tr, tc):
+            if board_state[nr][nc] != EMPTY:
+                continue
+            if row_remaining[nr] <= 0 or col_remaining[nc] <= 0:
+                continue
+            if not self._is_placement_safe(board_state, nr, nc):
+                continue
+            count += 1
+        return count
+
     def _is_board_valid(self, board_state):
         """Verify that all row and column constraints are exactly met."""
         for r in range(self.size):
