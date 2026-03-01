@@ -288,6 +288,11 @@ class GameScene:
         self.bot_last_scanned = 0
         self.last_bot_tick = 0
 
+        # Slow-Mo trace replay (BackBot only)
+        self.slow_mo = (mode == "versus_back")
+        self.trace_active = False
+        self.trace_board = None
+
         if mode in ("versus", "versus_smart", "versus_back"):
             self.bot_game = self.player_game.clone_for_race()
             if bot_class:
@@ -383,6 +388,13 @@ class GameScene:
             self.sm.switch(MenuScene(self.sm, self.assets))
             return
 
+        # S key: skip trace replay
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_s:
+            if self.trace_active:
+                self.trace_active = False
+                self.trace_board = None
+            return
+
         if ev.type != pygame.MOUSEBUTTONDOWN:
             return
 
@@ -475,23 +487,47 @@ class GameScene:
         self.hover_cell = self._cell_at(pygame.mouse.get_pos(),
                                         self.p_bx, self.p_by)
 
-        # Bot moves (threaded)
+        # Bot moves (threaded) or trace replay
         if self.bot is not None and not self.bot_stuck:
             now = pygame.time.get_ticks()
-            if not self.bot_thinking and now - self.last_bot_tick >= BOT_MS:
-                self.bot_thinking = True
-                self.bot_thread = threading.Thread(
-                    target=self._compute_bot, daemon=True)
-                self.bot_thread.start()
-            if (self.bot_thinking and self.bot_thread
-                    and not self.bot_thread.is_alive()):
-                self._apply_bot()
-                self.bot_thinking = False
-                self.last_bot_tick = pygame.time.get_ticks()
+            if self.trace_active:
+                # Trace replay mode: step through search events
+                if now - self.last_bot_tick >= 100:
+                    step = self.bot.get_trace_step()
+                    if step is None:
+                        self.trace_active = False
+                        self.trace_board = None
+                    else:
+                        action, r, c = step
+                        if action == "place":
+                            self.trace_board[r][c] = TENT
+                            self.flashes.append({
+                                "board": "bot", "r": r, "c": c,
+                                "color": BLUE, "time": time.time(),
+                                "duration": 0.15})
+                        elif action == "undo":
+                            self.trace_board[r][c] = EMPTY
+                            self.flashes.append({
+                                "board": "bot", "r": r, "c": c,
+                                "color": RED, "time": time.time(),
+                                "duration": 0.15})
+                    self.last_bot_tick = now
+            else:
+                if not self.bot_thinking and now - self.last_bot_tick >= BOT_MS:
+                    self.bot_thinking = True
+                    self.bot_thread = threading.Thread(
+                        target=self._compute_bot, daemon=True)
+                    self.bot_thread.start()
+                if (self.bot_thinking and self.bot_thread
+                        and not self.bot_thread.is_alive()):
+                    self._apply_bot()
+                    self.bot_thinking = False
+                    self.last_bot_tick = pygame.time.get_ticks()
 
         # Expire animations
         now = time.time()
-        self.flashes = [f for f in self.flashes if now - f["time"] < 0.35]
+        self.flashes = [f for f in self.flashes
+                        if now - f["time"] < f.get("duration", 0.35)]
         self.pops    = [p for p in self.pops    if now - p["time"] < 0.22]
 
     def _compute_bot(self):
@@ -501,6 +537,14 @@ class GameScene:
         move = self.bot_move_result
         self.bot_move_result = None
         if move:
+            # Start trace replay if slow-mo is enabled and trace available
+            if self.slow_mo and self.bot.has_trace():
+                self.trace_board = [row[:] for row in self.bot._trace_board]
+                self.trace_active = True
+                self.last_bot_tick = pygame.time.get_ticks()
+                self.slow_mo = False  # Only replay once
+                return
+
             r, c, mt, scanned = move
             self.bot_game.player_grid[r][c] = mt
             self.bot_last_scanned = scanned
@@ -521,8 +565,10 @@ class GameScene:
         self._draw_board(screen, self.player_game,
                          self.p_bx, self.p_by, is_player=True)
         if self.bot is not None:
+            override = self.trace_board if self.trace_active else None
             self._draw_board(screen, self.bot_game,
-                             self.b_bx, self.b_by, is_player=False)
+                             self.b_bx, self.b_by, is_player=False,
+                             grid_override=override)
             # Divider line
             pygame.draw.line(screen, DGRAY,
                              (SCREEN_W // 2, HEADER_H),
@@ -530,6 +576,9 @@ class GameScene:
             # Thinking indicator on the bot board
             if self.bot_thinking and not self.game_over:
                 self._draw_thinking(screen)
+            # Searching indicator during trace replay
+            if self.trace_active and not self.game_over:
+                self._draw_searching(screen)
         self._draw_flashes(screen)
         self._draw_footer(screen)
         if self.game_over:
@@ -575,12 +624,13 @@ class GameScene:
             screen.blit(bl, bl.get_rect(center=(bot_cx, self.b_by - 14)))
 
     #  board 
-    def _draw_board(self, screen, game, bx, by, *, is_player):
+    def _draw_board(self, screen, game, bx, by, *, is_player, grid_override=None):
         n   = game.size
         cs  = self.cell_size
         gx  = bx + CON_M
         gy  = by + CON_M
         gp  = cs * n
+        grid = grid_override if grid_override is not None else game.player_grid
 
         # Grid background
         pygame.draw.rect(screen, CELL_BG, (gx, gy, gp, gp))
@@ -590,7 +640,7 @@ class GameScene:
             for c in range(n):
                 cx = gx + c * cs
                 cy = gy + r * cs
-                st = game.player_grid[r][c]
+                st = grid[r][c]
                 if st == TREE:
                     screen.blit(self.assets.get("tree", cs), (cx, cy))
                 elif st == TENT:
@@ -656,7 +706,7 @@ class GameScene:
         for c in range(n):
             target = game.col_constraints[c]
             cur = sum(1 for r2 in range(n)
-                      if game.player_grid[r2][c] == TENT)
+                      if grid[r2][c] == TENT)
             col = _con_color(cur, target)
             if is_player and self.hover_cell and self.hover_cell[1] == c:
                 col = _brighten(col, 60)
@@ -668,7 +718,7 @@ class GameScene:
         for r in range(n):
             target = game.row_constraints[r]
             cur = sum(1 for c2 in range(n)
-                      if game.player_grid[r][c2] == TENT)
+                      if grid[r][c2] == TENT)
             col = _con_color(cur, target)
             if is_player and self.hover_cell and self.hover_cell[0] == r:
                 col = _brighten(col, 60)
@@ -707,6 +757,24 @@ class GameScene:
         txt = self.label_font.render(f"Thinking{dots}", True, BLUE)
         screen.blit(txt, txt.get_rect(center=(bx + bw // 2, by + bh // 2)))
 
+    def _draw_searching(self, screen):
+        """Draw a 'Searching...' badge on the bot board during trace replay."""
+        gx = self.b_bx + CON_M
+        gy = self.b_by + CON_M
+        gp = self.cell_size * self.grid_size
+
+        bw, bh = 230, 36
+        bx = gx + (gp - bw) // 2
+        by = gy + gp - bh - 4
+        badge = pygame.Surface((bw, bh), pygame.SRCALPHA)
+        badge.fill((30, 30, 30, 200))
+        screen.blit(badge, (bx, by))
+        pygame.draw.rect(screen, ORANGE, (bx, by, bw, bh), 2, border_radius=4)
+
+        dots = "." * ((pygame.time.get_ticks() // 300) % 4)
+        txt = self.label_font.render(f"Searching{dots} (S to skip)", True, ORANGE)
+        screen.blit(txt, txt.get_rect(center=(bx + bw // 2, by + bh // 2)))
+
     def _active_pop(self, is_player, r, c):
         board = "player" if is_player else "bot"
         for p in self.pops:
@@ -717,8 +785,9 @@ class GameScene:
     def _draw_flashes(self, screen):
         now = time.time()
         for f in self.flashes:
+            dur = f.get("duration", 0.35)
             el = now - f["time"]
-            alpha = int(160 * max(0, 1 - el / 0.35))
+            alpha = int(160 * max(0, 1 - el / dur))
             if alpha <= 0:
                 continue
             if f["board"] == "player":

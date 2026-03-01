@@ -20,6 +20,9 @@ class BackBot:
         self._solution = None  # Cached solved board
         self.focus_tree = None  # (r, c) of tree the bot is currently working on
         self.logger = GameLogger(self.size)
+        self._trace = []        # Search trace: [("place"|"undo", r, c), ...]
+        self._trace_board = None  # Board snapshot before backtracking
+        self._trace_index = 0
 
     def get_best_move(self):
         """Determine the next best move using hybrid greedy + backtracking.
@@ -79,6 +82,11 @@ class BackBot:
                     if board[r][c] == TENT:
                         row_remaining[r] -= 1
                         col_remaining[c] -= 1
+
+            # Save board state for trace replay (before backtracking)
+            self._trace = []
+            self._trace_index = 0
+            self._trace_board = copy.deepcopy(board)
 
             if not remaining_trees:
                 # Greedy solved everything — verify constraints
@@ -178,6 +186,7 @@ class BackBot:
 
             # Place tent and update capacities
             board_state[nr][nc] = TENT
+            self._trace.append(("place", nr, nc))
             row_remaining[nr] -= 1
             col_remaining[nc] -= 1
 
@@ -202,6 +211,7 @@ class BackBot:
             # Backtrack: undo GRASS neighbours, placement, and capacities
             self._restore_neighbors(board_state, grassed)
             board_state[nr][nc] = EMPTY
+            self._trace.append(("undo", nr, nc))
             row_remaining[nr] += 1
             col_remaining[nc] += 1
             self.logger.log_event(
@@ -303,3 +313,19 @@ class BackBot:
                 return False
 
         return True
+
+    # ------------------------------------------------------------------
+    # Trace replay (Slow-Mo Mode)
+    # ------------------------------------------------------------------
+
+    def get_trace_step(self):
+        """Return the next trace event or None if trace is exhausted."""
+        if self._trace_index >= len(self._trace):
+            return None
+        event = self._trace[self._trace_index]
+        self._trace_index += 1
+        return event
+
+    def has_trace(self):
+        """Return True if there are unplayed trace events."""
+        return self._trace_index < len(self._trace)
