@@ -182,19 +182,52 @@ class TentsGame:
 
     def check_victory(self):
         """
-        Checks if the current player_grid is a valid winning state.
-        For Phase 1, we simply check against the generated solution_grid
-        to ensure all tents are found.
-        Returns: True if correct, False otherwise.
+        Checks if the current player_grid is a valid winning state
+        using dynamic rule validation (supports alternative solutions).
+
+        Enforces:
+          1. Total tent count matches the number of trees.
+          2. Each row's tent count matches its constraint.
+          3. Each column's tent count matches its constraint.
+          4. No two tents are adjacent (horizontally, vertically, or diagonally).
+
+        Returns: True if all rules pass, False otherwise.
         """
-        # 1. Compare Tents
+        total_tents = 0
+
+        # Row constraint check + count total tents
+        for r in range(self.size):
+            row_tents = sum(1 for c in range(self.size)
+                            if self.player_grid[r][c] == TENT)
+            if row_tents != self.row_constraints[r]:
+                return False
+            total_tents += row_tents
+
+        # Total tent count must equal number of trees
+        if total_tents != len(self.trees):
+            return False
+
+        # Column constraint check
+        for c in range(self.size):
+            col_tents = sum(1 for r in range(self.size)
+                            if self.player_grid[r][c] == TENT)
+            if col_tents != self.col_constraints[c]:
+                return False
+
+        # Adjacency check: no tent may touch another tent in 8 directions
         for r in range(self.size):
             for c in range(self.size):
-                solution_is_tent = (self.solution_grid[r][c] == TENT)
-                player_is_tent = (self.player_grid[r][c] == TENT)
-                
-                if solution_is_tent != player_is_tent:
-                    return False
+                if self.player_grid[r][c] != TENT:
+                    continue
+                for dr in range(-1, 2):
+                    for dc in range(-1, 2):
+                        if dr == 0 and dc == 0:
+                            continue
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.size and 0 <= nc < self.size:
+                            if self.player_grid[nr][nc] == TENT:
+                                return False
+
         return True
 
     def clone_for_race(self):
