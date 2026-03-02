@@ -106,6 +106,13 @@ class BackBot:
             else:
                 return None
 
+            # Fill all remaining EMPTY cells with GRASS so the solution
+            # is a complete board (required for check_victory()).
+            for r in range(self.size):
+                for c in range(self.size):
+                    if self._solution[r][c] == EMPTY:
+                        self._solution[r][c] = GRASS
+
         # Priority 1: return the first pending TENT placement
         for r in range(self.size):
             for c in range(self.size):
