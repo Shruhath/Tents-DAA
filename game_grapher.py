@@ -142,6 +142,24 @@ class StateGrapher:
             f"{num_nodes} nodes explored",
             fontsize=14, fontweight="bold",
         )
+
+        # Empirical complexity metrics
+        time_complexity = len(self.graph.nodes)
+        space_complexity = nx.dag_longest_path_length(self.graph)
+        metrics_text = (
+            f"EMPIRICAL ANALYSIS\n"
+            f"----------------------\n"
+            f"Time Complexity: O({time_complexity}) operations\n"
+            f"Space Complexity: O({space_complexity}) max depth"
+        )
+        props = dict(boxstyle='round', facecolor='#2c3e50',
+                     alpha=0.9, edgecolor='#34495e')
+        ax.text(0.98, 0.02, metrics_text, transform=ax.transAxes,
+                fontsize=12, verticalalignment='bottom',
+                horizontalalignment='right', bbox=props,
+                color='white', fontweight='bold',
+                fontfamily='monospace', zorder=5)
+
         plt.tight_layout()
         plt.savefig(filepath, dpi=150)
         plt.close(fig)
