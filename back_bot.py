@@ -10,6 +10,7 @@ import copy
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
 from smart_bot import SmartBot
 from game_logger import GameLogger
+from game_grapher import StateGrapher
 
 
 class BackBot:
@@ -20,6 +21,7 @@ class BackBot:
         self._solution = None  # Cached solved board
         self.focus_tree = None  # (r, c) of tree the bot is currently working on
         self.logger = GameLogger(self.size)
+        self.grapher = StateGrapher()
         self._trace = []        # Search trace: [("place"|"undo", r, c), ...]
         self._trace_board = None  # Board snapshot before backtracking
         self._trace_index = 0
@@ -93,18 +95,24 @@ class BackBot:
             self._trace_index = 0
             self._trace_board = copy.deepcopy(board)
 
+            root_id = self.grapher.add_node("Start")
+
             if not remaining_trees:
                 # Greedy solved everything — verify constraints
                 if (all(v == 0 for v in row_remaining)
                         and all(v == 0 for v in col_remaining)):
                     self._solution = board
+                    self.grapher.set_victory_route(root_id)
                 else:
                     return None
             elif self._solve_recursive(board, remaining_trees, 0,
-                                       row_remaining, col_remaining):
+                                       row_remaining, col_remaining,
+                                       root_id):
                 self._solution = board
             else:
                 return None
+
+            self.grapher.render_graph(self.size)
 
             # Fill all remaining EMPTY cells with GRASS so the solution
             # is a complete board (required for check_victory()).
@@ -138,7 +146,7 @@ class BackBot:
     # ------------------------------------------------------------------
 
     def _solve_recursive(self, board_state, remaining_trees, depth,
-                         row_remaining, col_remaining):
+                         row_remaining, col_remaining, parent_id=None):
         """Core recursive backtracking with MRV heuristic.
 
         Args:
@@ -147,6 +155,7 @@ class BackBot:
             depth: Current recursion depth (for logging).
             row_remaining: Mutable list — how many tents each row still needs.
             col_remaining: Mutable list — how many tents each col still needs.
+            parent_id: Node ID in the search graph for edge tracking.
 
         Returns:
             True if a valid complete assignment was found, False otherwise.
@@ -157,6 +166,9 @@ class BackBot:
                      and all(v == 0 for v in col_remaining))
             if valid:
                 self.logger.log_event("[SOLVED] All trees assigned successfully!")
+                leaf = self.grapher.add_node("SOLVED")
+                self.grapher.add_edge(parent_id, leaf)
+                self.grapher.set_victory_route(leaf)
             return valid
 
         # MRV: compute domain sizes and pick the most constrained tree.
@@ -205,6 +217,10 @@ class BackBot:
             # Adjacency propagation: mark 8 neighbours as GRASS
             grassed = self._mark_neighbors_grass(board_state, nr, nc)
 
+            child_id = self.grapher.add_node(
+                f"D{depth} T({tree_r},{tree_c})\n@({nr},{nc})")
+            self.grapher.add_edge(parent_id, child_id)
+
             self.logger.log_event(
                 f"[RECURSE] Depth={depth} | Placing TENT for "
                 f"Tree({tree_r},{tree_c}) at ({nr},{nc}). "
@@ -220,11 +236,12 @@ class BackBot:
             # Recurse with remaining trees
             if self._solve_recursive(
                 board_state, next_remaining, depth + 1,
-                row_remaining, col_remaining,
+                row_remaining, col_remaining, child_id,
             ):
                 return True
 
             # Backtrack: undo GRASS neighbours, placement, and capacities
+            self.grapher.set_pruned(child_id)
             self._restore_neighbors(board_state, grassed)
             board_state[nr][nc] = EMPTY
             self._trace.append(("undo", nr, nc))

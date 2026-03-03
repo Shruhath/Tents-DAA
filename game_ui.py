@@ -492,7 +492,7 @@ class GameScene:
             now = pygame.time.get_ticks()
             if self.trace_active:
                 # Trace replay mode: step through search events
-                if now - self.last_bot_tick >= 100:
+                if now - self.last_bot_tick >= 600:
                     step = self.bot.get_trace_step()
                     if step is None:
                         self.trace_active = False
