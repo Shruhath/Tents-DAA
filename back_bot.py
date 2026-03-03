@@ -7,6 +7,7 @@ valid Tents puzzle.
 """
 
 import copy
+import time
 from tents import TentsGame, TREE, TENT, GRASS, EMPTY
 from smart_bot import SmartBot
 from game_logger import GameLogger
@@ -44,6 +45,7 @@ class BackBot:
 
         # Solve once and cache
         if self._solution is None:
+            solve_start = time.perf_counter()
             board = copy.deepcopy(self.game.player_grid)
 
             # --- Phase A: Greedy Pre-processing ---
@@ -120,6 +122,9 @@ class BackBot:
                 for c in range(self.size):
                     if self._solution[r][c] == EMPTY:
                         self._solution[r][c] = GRASS
+
+            elapsed = (time.perf_counter() - solve_start) * 1000
+            print(f"[BackBot] Solved {self.size}x{self.size} in {elapsed:.1f}ms")
 
         # Priority 1: return the first pending TENT placement
         for r in range(self.size):
