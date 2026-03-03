@@ -218,7 +218,7 @@ class BackBot:
             grassed = self._mark_neighbors_grass(board_state, nr, nc)
 
             child_id = self.grapher.add_node(
-                f"D{depth} T({tree_r},{tree_c})\n@({nr},{nc})")
+                f"D{depth} T({tree_r},{tree_c}) [dom={best_domain}]\n@({nr},{nc})")
             self.grapher.add_edge(parent_id, child_id)
 
             self.logger.log_event(
